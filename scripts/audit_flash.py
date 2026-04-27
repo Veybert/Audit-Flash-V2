@@ -514,9 +514,6 @@ class CVEDatabase:
         self._session.headers.update({'User-Agent': 'AuditFlash/5.0 Security Scanner'})
         if api_key:
             self._session.headers['apiKey'] = api_key
-        else:
-
-        # Vérification de l'en-tête apiKey
 
         # Charger le cache depuis le fichier si disponible
         if self.cache_file:
