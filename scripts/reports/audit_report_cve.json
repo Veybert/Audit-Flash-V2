@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-27T11:19:42.628993",
+  "timestamp": "2026-04-27T13:33:01.358385",
   "version": "5.0",
   "system_info": {
     "os": "Windows",
@@ -30,8 +30,8 @@
     "worst_severity": "CRITICAL",
     "total_cves": 5,
     "cve_by_severity": {
-      "CRITICAL": 3,
-      "HIGH": 1,
+      "CRITICAL": 2,
+      "HIGH": 2,
       "MEDIUM": 1,
       "LOW": 0
     },
@@ -73,43 +73,6 @@
         "_ip_context": "private"
       },
       {
-        "cve_id": "CVE-2022-22720",
-        "description": "Apache HTTP Server 2.4.52 and earlier fails to close inbound connection when errors are encountered discarding the request body, exposing the server to HTTP Request Smuggling",
-        "cvss_v3_score": 9.8,
-        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
-        "cvss_v2_score": 7.5,
-        "severity": "CRITICAL",
-        "published": "2022-03-14",
-        "modified": "2024-11-21",
-        "references": [
-          "http://seclists.org/fulldisclosure/2022/May/33",
-          "http://seclists.org/fulldisclosure/2022/May/35",
-          "http://seclists.org/fulldisclosure/2022/May/38",
-          "http://www.openwall.com/lists/oss-security/2022/03/14/3",
-          "https://httpd.apache.org/security/vulnerabilities_24.html"
-        ],
-        "affected_products": [
-          "apache http_server",
-          "fedoraproject fedora 34",
-          "fedoraproject fedora 35",
-          "fedoraproject fedora 36"
-        ],
-        "cwe_ids": [
-          "CWE-444",
-          "CWE-444"
-        ],
-        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2022-22720",
-        "confidence": "CONFIRMED",
-        "remotely_exploitable": true,
-        "no_auth_required": true,
-        "no_user_interaction": true,
-        "age_factor": 0.8,
-        "cvss_age_weighted": 7.84,
-        "nvd_comment": "",
-        "_finding_type": "CONFIRMED",
-        "_ip_context": "private"
-      },
-      {
         "cve_id": "CVE-2021-42013",
         "description": "It was found that the fix for CVE-2021-41773 in Apache HTTP Server 2.4.50 was insufficient. An attacker could use a path traversal attack to map URLs to files outside the directories configured by Alias-like directives. If files outside of these directories are not protected by the usual default configuration \"require all denied\", these requests can succeed. If CGI scripts are also enabled for these aliased pathes, this could allow for remote code execution. This issue only affects Apache 2.4.49",
         "cvss_v3_score": 9.8,
@@ -148,6 +111,42 @@
         "_ip_context": "private"
       },
       {
+        "cve_id": "CVE-2022-26377",
+        "description": "Inconsistent Interpretation of HTTP Requests ('HTTP Request Smuggling') vulnerability in mod_proxy_ajp of Apache HTTP Server allows an attacker to smuggle requests to the AJP server it forwards requests to. This issue affects Apache HTTP Server Apache HTTP Server 2.4 version 2.4.53 and prior versions.",
+        "cvss_v3_score": 7.5,
+        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "cvss_v2_score": 5.0,
+        "severity": "HIGH",
+        "published": "2022-06-09",
+        "modified": "2025-05-01",
+        "references": [
+          "http://www.openwall.com/lists/oss-security/2022/06/08/2",
+          "https://httpd.apache.org/security/vulnerabilities_24.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/7QUGG2QZWHTITMABFLVXA4DNYUOTPWYQ/",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/YPY2BLEVJWFH34AX77ZJPLD2OOBYR6ND/",
+          "https://security.gentoo.org/glsa/202208-20"
+        ],
+        "affected_products": [
+          "apache http_server",
+          "fedoraproject fedora 35",
+          "fedoraproject fedora 36"
+        ],
+        "cwe_ids": [
+          "CWE-444",
+          "CWE-444"
+        ],
+        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2022-26377",
+        "confidence": "CONFIRMED",
+        "remotely_exploitable": true,
+        "no_auth_required": true,
+        "no_user_interaction": true,
+        "age_factor": 0.8,
+        "cvss_age_weighted": 6.0,
+        "nvd_comment": "",
+        "_finding_type": "CONFIRMED",
+        "_ip_context": "private"
+      },
+      {
         "cve_id": "CVE-2023-43622",
         "description": "An attacker, opening a HTTP/2 connection with an initial window size of 0, was able to block handling of that connection indefinitely in Apache HTTP Server. This could be used to exhaust worker resources in the server, similar to the well known \"slow loris\" attack pattern.\nThis has been fixed in version 2.4.58, so that such connection are terminated properly after the configured connection timeout.\n\nThis issue affects Apache HTTP Server: from 2.4.55 through 2.4.57.\n\nUsers are recommended to upgr",
         "cvss_v3_score": 7.5,
@@ -180,38 +179,35 @@
         "_ip_context": "private"
       },
       {
-        "cve_id": "CVE-2023-45802",
-        "description": "When a HTTP/2 stream was reset (RST frame) by a client, there was a time window were the request's memory resources were not reclaimed immediately. Instead, de-allocation was deferred to connection close. A client could send new requests and resets, keeping the connection busy and open and causing the memory footprint to keep on growing. On connection close, all resources were reclaimed, but the process might run out of memory before that.\n\nThis was found by the reporter during testing of CVE-20",
-        "cvss_v3_score": 5.9,
-        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "cve_id": "CVE-2022-37436",
+        "description": "Prior to Apache HTTP Server 2.4.55, a malicious backend can cause the response headers to be truncated early, resulting in some headers being incorporated into the response body. If the later headers have any security purpose, they will not be interpreted by the client.",
+        "cvss_v3_score": 5.3,
+        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
         "cvss_v2_score": 0.0,
         "severity": "MEDIUM",
-        "published": "2023-10-23",
-        "modified": "2025-08-25",
+        "published": "2023-01-17",
+        "modified": "2025-04-04",
         "references": [
           "https://httpd.apache.org/security/vulnerabilities_24.html",
+          "https://security.gentoo.org/glsa/202309-01",
           "https://httpd.apache.org/security/vulnerabilities_24.html",
-          "https://lists.debian.org/debian-lts-announce/2024/05/msg00013.html",
-          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/2MBEPPC36UBVOZZNAXFHKLFGSLCMN5LI/",
-          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/BFQD3KUEMFBHPAPBGLWQC34L4OWL5HAZ/"
+          "https://security.gentoo.org/glsa/202309-01"
         ],
         "affected_products": [
-          "apache http_server",
-          "fedoraproject fedora 37",
-          "fedoraproject fedora 38",
-          "fedoraproject fedora 39"
+          "apache http_server"
         ],
         "cwe_ids": [
-          "CWE-404",
-          "CWE-404"
+          "CWE-113",
+          "CWE-436",
+          "CWE-113"
         ],
-        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2023-45802",
+        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2022-37436",
         "confidence": "CONFIRMED",
         "remotely_exploitable": true,
         "no_auth_required": true,
         "no_user_interaction": true,
         "age_factor": 0.85,
-        "cvss_age_weighted": 5.02,
+        "cvss_age_weighted": 4.5,
         "nvd_comment": "",
         "_finding_type": "CONFIRMED",
         "_ip_context": "private"
@@ -220,8 +216,8 @@
   },
   "cve_summary": {
     "total_unique_cves": 5,
-    "critical_cves": 3,
-    "high_cves": 1,
+    "critical_cves": 2,
+    "high_cves": 2,
     "medium_cves": 1,
     "low_cves": 0,
     "all_cves": [
@@ -261,43 +257,6 @@
         "_ip_context": "private"
       },
       {
-        "cve_id": "CVE-2022-22720",
-        "description": "Apache HTTP Server 2.4.52 and earlier fails to close inbound connection when errors are encountered discarding the request body, exposing the server to HTTP Request Smuggling",
-        "cvss_v3_score": 9.8,
-        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
-        "cvss_v2_score": 7.5,
-        "severity": "CRITICAL",
-        "published": "2022-03-14",
-        "modified": "2024-11-21",
-        "references": [
-          "http://seclists.org/fulldisclosure/2022/May/33",
-          "http://seclists.org/fulldisclosure/2022/May/35",
-          "http://seclists.org/fulldisclosure/2022/May/38",
-          "http://www.openwall.com/lists/oss-security/2022/03/14/3",
-          "https://httpd.apache.org/security/vulnerabilities_24.html"
-        ],
-        "affected_products": [
-          "apache http_server",
-          "fedoraproject fedora 34",
-          "fedoraproject fedora 35",
-          "fedoraproject fedora 36"
-        ],
-        "cwe_ids": [
-          "CWE-444",
-          "CWE-444"
-        ],
-        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2022-22720",
-        "confidence": "CONFIRMED",
-        "remotely_exploitable": true,
-        "no_auth_required": true,
-        "no_user_interaction": true,
-        "age_factor": 0.8,
-        "cvss_age_weighted": 7.84,
-        "nvd_comment": "",
-        "_finding_type": "CONFIRMED",
-        "_ip_context": "private"
-      },
-      {
         "cve_id": "CVE-2021-42013",
         "description": "It was found that the fix for CVE-2021-41773 in Apache HTTP Server 2.4.50 was insufficient. An attacker could use a path traversal attack to map URLs to files outside the directories configured by Alias-like directives. If files outside of these directories are not protected by the usual default configuration \"require all denied\", these requests can succeed. If CGI scripts are also enabled for these aliased pathes, this could allow for remote code execution. This issue only affects Apache 2.4.49",
         "cvss_v3_score": 9.8,
@@ -336,6 +295,42 @@
         "_ip_context": "private"
       },
       {
+        "cve_id": "CVE-2022-26377",
+        "description": "Inconsistent Interpretation of HTTP Requests ('HTTP Request Smuggling') vulnerability in mod_proxy_ajp of Apache HTTP Server allows an attacker to smuggle requests to the AJP server it forwards requests to. This issue affects Apache HTTP Server Apache HTTP Server 2.4 version 2.4.53 and prior versions.",
+        "cvss_v3_score": 7.5,
+        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "cvss_v2_score": 5.0,
+        "severity": "HIGH",
+        "published": "2022-06-09",
+        "modified": "2025-05-01",
+        "references": [
+          "http://www.openwall.com/lists/oss-security/2022/06/08/2",
+          "https://httpd.apache.org/security/vulnerabilities_24.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/7QUGG2QZWHTITMABFLVXA4DNYUOTPWYQ/",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/YPY2BLEVJWFH34AX77ZJPLD2OOBYR6ND/",
+          "https://security.gentoo.org/glsa/202208-20"
+        ],
+        "affected_products": [
+          "apache http_server",
+          "fedoraproject fedora 35",
+          "fedoraproject fedora 36"
+        ],
+        "cwe_ids": [
+          "CWE-444",
+          "CWE-444"
+        ],
+        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2022-26377",
+        "confidence": "CONFIRMED",
+        "remotely_exploitable": true,
+        "no_auth_required": true,
+        "no_user_interaction": true,
+        "age_factor": 0.8,
+        "cvss_age_weighted": 6.0,
+        "nvd_comment": "",
+        "_finding_type": "CONFIRMED",
+        "_ip_context": "private"
+      },
+      {
         "cve_id": "CVE-2023-43622",
         "description": "An attacker, opening a HTTP/2 connection with an initial window size of 0, was able to block handling of that connection indefinitely in Apache HTTP Server. This could be used to exhaust worker resources in the server, similar to the well known \"slow loris\" attack pattern.\nThis has been fixed in version 2.4.58, so that such connection are terminated properly after the configured connection timeout.\n\nThis issue affects Apache HTTP Server: from 2.4.55 through 2.4.57.\n\nUsers are recommended to upgr",
         "cvss_v3_score": 7.5,
@@ -368,38 +363,35 @@
         "_ip_context": "private"
       },
       {
-        "cve_id": "CVE-2023-45802",
-        "description": "When a HTTP/2 stream was reset (RST frame) by a client, there was a time window were the request's memory resources were not reclaimed immediately. Instead, de-allocation was deferred to connection close. A client could send new requests and resets, keeping the connection busy and open and causing the memory footprint to keep on growing. On connection close, all resources were reclaimed, but the process might run out of memory before that.\n\nThis was found by the reporter during testing of CVE-20",
-        "cvss_v3_score": 5.9,
-        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "cve_id": "CVE-2022-37436",
+        "description": "Prior to Apache HTTP Server 2.4.55, a malicious backend can cause the response headers to be truncated early, resulting in some headers being incorporated into the response body. If the later headers have any security purpose, they will not be interpreted by the client.",
+        "cvss_v3_score": 5.3,
+        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
         "cvss_v2_score": 0.0,
         "severity": "MEDIUM",
-        "published": "2023-10-23",
-        "modified": "2025-08-25",
+        "published": "2023-01-17",
+        "modified": "2025-04-04",
         "references": [
           "https://httpd.apache.org/security/vulnerabilities_24.html",
+          "https://security.gentoo.org/glsa/202309-01",
           "https://httpd.apache.org/security/vulnerabilities_24.html",
-          "https://lists.debian.org/debian-lts-announce/2024/05/msg00013.html",
-          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/2MBEPPC36UBVOZZNAXFHKLFGSLCMN5LI/",
-          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/BFQD3KUEMFBHPAPBGLWQC34L4OWL5HAZ/"
+          "https://security.gentoo.org/glsa/202309-01"
         ],
         "affected_products": [
-          "apache http_server",
-          "fedoraproject fedora 37",
-          "fedoraproject fedora 38",
-          "fedoraproject fedora 39"
+          "apache http_server"
         ],
         "cwe_ids": [
-          "CWE-404",
-          "CWE-404"
+          "CWE-113",
+          "CWE-436",
+          "CWE-113"
         ],
-        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2023-45802",
+        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2022-37436",
         "confidence": "CONFIRMED",
         "remotely_exploitable": true,
         "no_auth_required": true,
         "no_user_interaction": true,
         "age_factor": 0.85,
-        "cvss_age_weighted": 5.02,
+        "cvss_age_weighted": 4.5,
         "nvd_comment": "",
         "_finding_type": "CONFIRMED",
         "_ip_context": "private"
@@ -442,43 +434,6 @@
         "_ip_context": "private"
       },
       {
-        "cve_id": "CVE-2022-22720",
-        "description": "Apache HTTP Server 2.4.52 and earlier fails to close inbound connection when errors are encountered discarding the request body, exposing the server to HTTP Request Smuggling",
-        "cvss_v3_score": 9.8,
-        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
-        "cvss_v2_score": 7.5,
-        "severity": "CRITICAL",
-        "published": "2022-03-14",
-        "modified": "2024-11-21",
-        "references": [
-          "http://seclists.org/fulldisclosure/2022/May/33",
-          "http://seclists.org/fulldisclosure/2022/May/35",
-          "http://seclists.org/fulldisclosure/2022/May/38",
-          "http://www.openwall.com/lists/oss-security/2022/03/14/3",
-          "https://httpd.apache.org/security/vulnerabilities_24.html"
-        ],
-        "affected_products": [
-          "apache http_server",
-          "fedoraproject fedora 34",
-          "fedoraproject fedora 35",
-          "fedoraproject fedora 36"
-        ],
-        "cwe_ids": [
-          "CWE-444",
-          "CWE-444"
-        ],
-        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2022-22720",
-        "confidence": "CONFIRMED",
-        "remotely_exploitable": true,
-        "no_auth_required": true,
-        "no_user_interaction": true,
-        "age_factor": 0.8,
-        "cvss_age_weighted": 7.84,
-        "nvd_comment": "",
-        "_finding_type": "CONFIRMED",
-        "_ip_context": "private"
-      },
-      {
         "cve_id": "CVE-2021-42013",
         "description": "It was found that the fix for CVE-2021-41773 in Apache HTTP Server 2.4.50 was insufficient. An attacker could use a path traversal attack to map URLs to files outside the directories configured by Alias-like directives. If files outside of these directories are not protected by the usual default configuration \"require all denied\", these requests can succeed. If CGI scripts are also enabled for these aliased pathes, this could allow for remote code execution. This issue only affects Apache 2.4.49",
         "cvss_v3_score": 9.8,
@@ -517,6 +472,42 @@
         "_ip_context": "private"
       },
       {
+        "cve_id": "CVE-2022-26377",
+        "description": "Inconsistent Interpretation of HTTP Requests ('HTTP Request Smuggling') vulnerability in mod_proxy_ajp of Apache HTTP Server allows an attacker to smuggle requests to the AJP server it forwards requests to. This issue affects Apache HTTP Server Apache HTTP Server 2.4 version 2.4.53 and prior versions.",
+        "cvss_v3_score": 7.5,
+        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "cvss_v2_score": 5.0,
+        "severity": "HIGH",
+        "published": "2022-06-09",
+        "modified": "2025-05-01",
+        "references": [
+          "http://www.openwall.com/lists/oss-security/2022/06/08/2",
+          "https://httpd.apache.org/security/vulnerabilities_24.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/7QUGG2QZWHTITMABFLVXA4DNYUOTPWYQ/",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/YPY2BLEVJWFH34AX77ZJPLD2OOBYR6ND/",
+          "https://security.gentoo.org/glsa/202208-20"
+        ],
+        "affected_products": [
+          "apache http_server",
+          "fedoraproject fedora 35",
+          "fedoraproject fedora 36"
+        ],
+        "cwe_ids": [
+          "CWE-444",
+          "CWE-444"
+        ],
+        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2022-26377",
+        "confidence": "CONFIRMED",
+        "remotely_exploitable": true,
+        "no_auth_required": true,
+        "no_user_interaction": true,
+        "age_factor": 0.8,
+        "cvss_age_weighted": 6.0,
+        "nvd_comment": "",
+        "_finding_type": "CONFIRMED",
+        "_ip_context": "private"
+      },
+      {
         "cve_id": "CVE-2023-43622",
         "description": "An attacker, opening a HTTP/2 connection with an initial window size of 0, was able to block handling of that connection indefinitely in Apache HTTP Server. This could be used to exhaust worker resources in the server, similar to the well known \"slow loris\" attack pattern.\nThis has been fixed in version 2.4.58, so that such connection are terminated properly after the configured connection timeout.\n\nThis issue affects Apache HTTP Server: from 2.4.55 through 2.4.57.\n\nUsers are recommended to upgr",
         "cvss_v3_score": 7.5,
@@ -549,47 +540,44 @@
         "_ip_context": "private"
       },
       {
-        "cve_id": "CVE-2023-45802",
-        "description": "When a HTTP/2 stream was reset (RST frame) by a client, there was a time window were the request's memory resources were not reclaimed immediately. Instead, de-allocation was deferred to connection close. A client could send new requests and resets, keeping the connection busy and open and causing the memory footprint to keep on growing. On connection close, all resources were reclaimed, but the process might run out of memory before that.\n\nThis was found by the reporter during testing of CVE-20",
-        "cvss_v3_score": 5.9,
-        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "cve_id": "CVE-2022-37436",
+        "description": "Prior to Apache HTTP Server 2.4.55, a malicious backend can cause the response headers to be truncated early, resulting in some headers being incorporated into the response body. If the later headers have any security purpose, they will not be interpreted by the client.",
+        "cvss_v3_score": 5.3,
+        "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
         "cvss_v2_score": 0.0,
         "severity": "MEDIUM",
-        "published": "2023-10-23",
-        "modified": "2025-08-25",
+        "published": "2023-01-17",
+        "modified": "2025-04-04",
         "references": [
           "https://httpd.apache.org/security/vulnerabilities_24.html",
+          "https://security.gentoo.org/glsa/202309-01",
           "https://httpd.apache.org/security/vulnerabilities_24.html",
-          "https://lists.debian.org/debian-lts-announce/2024/05/msg00013.html",
-          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/2MBEPPC36UBVOZZNAXFHKLFGSLCMN5LI/",
-          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/BFQD3KUEMFBHPAPBGLWQC34L4OWL5HAZ/"
+          "https://security.gentoo.org/glsa/202309-01"
         ],
         "affected_products": [
-          "apache http_server",
-          "fedoraproject fedora 37",
-          "fedoraproject fedora 38",
-          "fedoraproject fedora 39"
+          "apache http_server"
         ],
         "cwe_ids": [
-          "CWE-404",
-          "CWE-404"
+          "CWE-113",
+          "CWE-436",
+          "CWE-113"
         ],
-        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2023-45802",
+        "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2022-37436",
         "confidence": "CONFIRMED",
         "remotely_exploitable": true,
         "no_auth_required": true,
         "no_user_interaction": true,
         "age_factor": 0.85,
-        "cvss_age_weighted": 5.02,
+        "cvss_age_weighted": 4.5,
         "nvd_comment": "",
         "_finding_type": "CONFIRMED",
         "_ip_context": "private"
       }
     ],
     "cpe_local_cves": [
+      "CVE-2022-37436",
       "CVE-2022-31813",
-      "CVE-2022-22720",
-      "CVE-2023-45802",
+      "CVE-2022-26377",
       "CVE-2023-43622",
       "CVE-2021-42013"
     ],
@@ -1054,8 +1042,8 @@
         "top_cve_id": "CVE-2007-4723",
         "cpe_cves": [
           "CVE-2022-31813",
-          "CVE-2022-22720",
-          "CVE-2023-45802",
+          "CVE-2022-26377",
+          "CVE-2022-37436",
           "CVE-2023-43622",
           "CVE-2021-42013"
         ]
