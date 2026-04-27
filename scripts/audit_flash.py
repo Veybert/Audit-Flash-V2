@@ -3540,9 +3540,11 @@ class AuditFlashWindows:
                             nse_cve_list.append(all_cves_map[cve_id])
 
         # --- Cyberscore calculation ---
+        # Inclure toutes les CVE enrichies (NVD/CPE/NSE/tests) dans le calcul
+        all_enriched_cves = list(all_cves_map.values())
         cyberscore = CyberScore.calculate_score(
             vulnerabilities,
-            extra_cves=nse_cve_list,
+            extra_cves=all_enriched_cves,
             extra_ports=len(nse_vulnerable_ports)
         )
 
