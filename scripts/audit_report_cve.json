@@ -1,0 +1,116 @@
+{
+  "timestamp": "2026-03-12T15:58:40.411175",
+  "version": "5.0",
+  "system_info": {
+    "os": "Windows",
+    "os_version": "11",
+    "python_version": "3.14.3"
+  },
+  "scan_config": {
+    "nse_scripts": [],
+    "banner_grab": true,
+    "nmap_mode": true,
+    "cpe_database_size": 13
+  },
+  "cyberscore": {
+    "grade": "A",
+    "label": "EXCELLENT",
+    "final_score": 0,
+    "score_breakdown": {
+      "base_score_gravity": 0,
+      "volume_score_cve_count": 0,
+      "exposure_score_services": 0,
+      "max_possible": 100,
+      "note": "gravité(0-60) + volume_CVE(0-25) + nb_services(0-15)"
+    },
+    "worst_cvss": 0.0,
+    "worst_severity": "NONE",
+    "total_cves": 0,
+    "cve_by_severity": {
+      "CRITICAL": 0,
+      "HIGH": 0,
+      "MEDIUM": 0,
+      "LOW": 0
+    },
+    "total_vulnerabilities": 0
+  },
+  "cve_summary": {
+    "total_unique_cves": 0,
+    "critical_cves": 0,
+    "high_cves": 0,
+    "medium_cves": 0,
+    "low_cves": 0,
+    "all_cves": [],
+    "cpe_local_cves": [
+      "CVE-2021-23017",
+      "CVE-2019-20372"
+    ],
+    "nse_cves": []
+  },
+  "nse_scan": {
+    "enabled": false,
+    "scripts_used": [],
+    "results_by_script": {},
+    "total_cves_found": 0,
+    "raw_results": {}
+  },
+  "banner_grabbing": {
+    "enabled": true,
+    "products_detected": {},
+    "total_products": 0
+  },
+  "summary": {
+    "total_hosts": 1,
+    "total_services": 2,
+    "vulnerabilities_found": 0,
+    "vulnerabilities_by_type": {}
+  },
+  "vulnerabilities": [],
+  "all_results": [
+    {
+      "ip": "10.26.1.245",
+      "hostname": "",
+      "port": 53,
+      "service": "domain",
+      "product": "",
+      "version": "",
+      "test_result": {
+        "service": "DNS",
+        "vulnerable": false,
+        "vulnerability_type": null,
+        "details": "Module dnspython non installé",
+        "records": [],
+        "cves": []
+      }
+    },
+    {
+      "ip": "10.26.1.245",
+      "hostname": "",
+      "port": 80,
+      "service": "http",
+      "product": "nginx",
+      "version": "",
+      "test_result": {
+        "service": "HTTP",
+        "vulnerable": false,
+        "vulnerability_type": null,
+        "details": "Erreur: HTTPSConnectionPool(host='10.26.1.245', port=443): Max retries exceeded with url: / (Caused by ConnectTimeoutError(<HTTPSConnection(host='10.26.1.245', port=443) at 0x24288661be0>, 'Connection to 10.26.1.245 timed out. (connect timeout=3)'))",
+        "headers": {},
+        "sensitive_paths": [],
+        "cves": [],
+        "product": "nginx",
+        "version": "",
+        "credentials": null,
+        "cpe_cves": [
+          "CVE-2021-23017",
+          "CVE-2019-20372"
+        ]
+      }
+    }
+  ],
+  "vlan_discovery": {
+    "enabled": false,
+    "vlans_found": 0,
+    "vlans": []
+  }
+}

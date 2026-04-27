@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Flash 4.0 — Note D (70/100) — 05/03/2026 11:53</title>
+    <!-- Fonts : chargées si connecté, fallback système sinon -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:       #0b0e14;
+            --surface:  #111520;
+            --border:   #1e2535;
+            --muted:    #4a5568;
+            --text:     #d1d9e6;
+            --heading:  #eef2ff;
+
+            --grade-A: #00e5a0;
+            --grade-B: #38bdf8;
+            --grade-C: #facc15;
+            --grade-D: #fb923c;
+            --grade-E: #f43f5e;
+
+            --sev-critical: #f43f5e;
+            --sev-high:     #fb923c;
+            --sev-medium:   #facc15;
+            --sev-low:      #34d399;
+            --sev-none:     #64748b;
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        body {
+            font-family: 'Syne', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── SCANLINE overlay ──────────────────────────────────── */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,.12) 2px,
+                rgba(0,0,0,.12) 4px
+            );
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* ── DROP ZONE ─────────────────────────────────────────── */
+        #dropZone {
+            position: fixed; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 24px;
+            transition: opacity .4s, visibility .4s;
+        }
+        #dropZone.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        .drop-box {
+            width: min(560px, 90vw);
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 64px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .2s, background .2s;
+            position: relative;
+            background: var(--surface);
+        }
+        .drop-box:hover, .drop-box.drag-over {
+            border-color: var(--grade-A);
+            background: rgba(0,229,160,.05);
+        }
+        .drop-logo {
+            font-size: 3.5rem;
+            margin-bottom: 16px;
+            display: block;
+        }
+        .drop-title {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: var(--heading);
+            margin-bottom: 8px;
+            letter-spacing: -.02em;
+        }
+        .drop-sub {
+            font-size: .95rem;
+            color: var(--muted);
+            font-family: 'DM Mono', monospace;
+        }
+        .drop-btn {
+            margin-top: 28px;
+            display: inline-block;
+            background: var(--grade-A);
+            color: #0b0e14;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: .95rem;
+            padding: 12px 32px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            letter-spacing: .02em;
+            transition: opacity .2s;
+        }
+        .drop-btn:hover { opacity: .85; }
+        #fileInput { display: none; }
+
+        /* ── REPORT WRAPPER ────────────────────────────────────── */
+        #report {
+            display: none;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 32px 24px 80px;
+        }
+        #report.visible { display: block; }
+
+        /* ── TOP NAV ───────────────────────────────────────────── */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0 32px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 40px;
+        }
+        .topbar-brand {
+            font-weight: 800;
+            font-size: 1.1rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: var(--grade-A);
+        }
+        .topbar-meta {
+            font-family: 'DM Mono', monospace;
+            font-size: .8rem;
+            color: var(--muted);
+            text-align: right;
+        }
+        .btn-reload {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-family: 'DM Mono', monospace;
+            font-size: .8rem;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color .2s, color .2s;
+        }
+        .btn-reload:hover { border-color: var(--text); color: var(--text); }
+
+        /* ── SECTION TITLE ─────────────────────────────────────── */
+        .sec-title {
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+
+        /* ── GRADE HERO ────────────────────────────────────────── */
+        .hero {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 40px;
+            align-items: center;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 10% 50%, var(--grade-color, #00e5a0) 0%, transparent 60%);
+            opacity: .07;
+            pointer-events: none;
+        }
+
+        .grade-circle {
+            width: 130px; height: 130px;
+            border-radius: 50%;
+            border: 4px solid var(--grade-color, var(--grade-A));
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .grade-letter {
+            font-size: 4rem;
+            font-weight: 800;
+            color: var(--grade-color, var(--grade-A));
+            line-height: 1;
+        }
+
+        .hero-info {}
+        .hero-label {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--heading);
+            letter-spacing: -.02em;
+            margin-bottom: 4px;
+        }
+        .hero-score {
+            font-family: 'DM Mono', monospace;
+            font-size: 1rem;
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+        .hero-score strong { color: var(--grade-color, var(--grade-A)); }
+
+        /* Progress bar */
+        .progress-track {
+            height: 8px;
+            background: var(--border);
+            border-radius: 99px;
+            overflow: hidden;
+            width: 100%;
+            max-width: 460px;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 99px;
+            background: var(--grade-color, var(--grade-A));
+            transition: width 1s cubic-bezier(.4,0,.2,1);
+            width: 0;
+        }
+
+        /* ── SCORE BREAKDOWN ───────────────────────────────────── */
+        .breakdown {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .breakdown-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 22px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        .breakdown-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--accent, var(--muted));
+            border-radius: 0 0 12px 12px;
+        }
+        .breakdown-card[data-type="gravity"]   { --accent: var(--sev-critical); }
+        .breakdown-card[data-type="volume"]    { --accent: var(--grade-B); }
+        .breakdown-card[data-type="exposure"]  { --accent: var(--sev-medium); }
+
+        .bk-value {
+            font-family: 'DM Mono', monospace;
+            font-size: 2.2rem;
+            font-weight: 500;
+            color: var(--heading);
+            line-height: 1;
+        }
+        .bk-max {
+            font-size: .85rem;
+            color: var(--muted);
+        }
+        .bk-label {
+            margin-top: 8px;
+            font-size: .8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--accent, var(--muted));
+        }
+        .bk-desc {
+            margin-top: 4px;
+            font-size: .8rem;
+            color: var(--muted);
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* ── STATS ROW ─────────────────────────────────────────── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .stat-pill {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-num {
+            font-family: 'DM Mono', monospace;
+            font-size: 2rem;
+            font-weight: 500;
+            color: var(--heading);
+            display: block;
+        }
+        .stat-lbl {
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        /* ── CVE SEVERITY BAR ──────────────────────────────────── */
+        .sev-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+        .sev-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .sev-row {
+            display: grid;
+            grid-template-columns: 90px 1fr 40px;
+            align-items: center;
+            gap: 12px;
+        }
+        .sev-name {
+            font-size: .8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+        .sev-track {
+            height: 10px;
+            background: var(--border);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+        .sev-bar {
+            height: 100%;
+            border-radius: 99px;
+            transition: width 1s .2s cubic-bezier(.4,0,.2,1);
+            width: 0;
+        }
+        .sev-count {
+            font-family: 'DM Mono', monospace;
+            font-size: .85rem;
+            color: var(--muted);
+            text-align: right;
+        }
+
+        /* ── VULNERABILITIES ───────────────────────────────────── */
+        .vuln-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .vuln-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: border-color .2s;
+        }
+        .vuln-card:hover { border-color: var(--sev-color, var(--muted)); }
+
+        .vuln-head {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .vuln-badge {
+            flex-shrink: 0;
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: .7rem;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            background: color-mix(in srgb, var(--sev-color) 15%, transparent);
+            color: var(--sev-color);
+            border: 1px solid color-mix(in srgb, var(--sev-color) 30%, transparent);
+        }
+        .vuln-service {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--heading);
+        }
+        .vuln-ip {
+            font-family: 'DM Mono', monospace;
+            font-size: .85rem;
+            color: var(--muted);
+            margin-left: auto;
+        }
+
+        .vuln-body {
+            padding: 16px 20px;
+        }
+        .vuln-details {
+            font-size: .9rem;
+            color: var(--text);
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+        .vuln-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .vuln-tag {
+            font-family: 'DM Mono', monospace;
+            font-size: .75rem;
+            color: var(--muted);
+            background: var(--bg);
+            padding: 3px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        /* CVE chips inside a vuln */
+        .cve-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+        .cve-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: .78rem;
+            font-family: 'DM Mono', monospace;
+            transition: border-color .2s;
+        }
+        .cve-chip:hover { border-color: var(--sev-color, var(--muted)); }
+        a.cve-chip { text-decoration: none; cursor: pointer; }
+        a.cve-chip:hover { filter: brightness(1.2); }
+        .cve-chip-id { color: var(--heading); font-weight: 500; }
+        .cve-link { color: var(--heading); text-decoration: none; font-weight: 500; }
+        .cve-link:hover { text-decoration: underline; filter: brightness(1.3); }
+        .cve-chip-score {
+            padding: 1px 7px;
+            border-radius: 99px;
+            font-size: .7rem;
+            font-weight: 700;
+            background: color-mix(in srgb, var(--chip-col) 20%, transparent);
+            color: var(--chip-col);
+        }
+
+        /* ── TOP CVE TABLE ─────────────────────────────────────── */
+        .cve-table-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 32px;
+        }
+        .cve-table-header {
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead th {
+            padding: 10px 16px;
+            font-size: .72rem;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: var(--muted);
+            text-align: left;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+        }
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background .15s;
+        }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: rgba(255,255,255,.02); }
+        td {
+            padding: 12px 16px;
+            font-size: .85rem;
+            vertical-align: top;
+        }
+        .td-id {
+            font-family: 'DM Mono', monospace;
+            font-weight: 500;
+            color: var(--heading);
+            white-space: nowrap;
+        }
+        .td-desc {
+            color: var(--text);
+            line-height: 1.5;
+            max-width: 380px;
+        }
+        .td-score {
+            white-space: nowrap;
+            text-align: center;
+        }
+        .score-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 99px;
+            font-family: 'DM Mono', monospace;
+            font-size: .78rem;
+            font-weight: 700;
+        }
+        .td-sev { white-space: nowrap; }
+        .sev-dot {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: .78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+        .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* ── GRADE SCALE ───────────────────────────────────────── */
+        .scale-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 48px;
+        }
+        .scale-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 16px;
+            text-align: center;
+            transition: border-color .2s;
+        }
+        .scale-card.active {
+            border-color: var(--g-col);
+            background: color-mix(in srgb, var(--g-col) 8%, var(--surface));
+        }
+        .scale-card .g-letter {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--g-col);
+            line-height: 1;
+        }
+        .scale-card .g-range {
+            font-family: 'DM Mono', monospace;
+            font-size: .7rem;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+        .scale-card .g-label {
+            font-size: .75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: var(--g-col);
+            margin-top: 6px;
+        }
+        .scale-card .g-desc {
+            font-size: .72rem;
+            color: var(--muted);
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+        .scale-card .active-arrow {
+            display: none;
+            font-size: .75rem;
+            color: var(--g-col);
+            margin-top: 8px;
+            font-weight: 700;
+        }
+        .scale-card.active .active-arrow { display: block; }
+
+        /* ── FOOTER ────────────────────────────────────────────── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 24px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'DM Mono', monospace;
+            font-size: .75rem;
+            color: var(--muted);
+        }
+
+        /* ── EMPTY STATE ───────────────────────────────────────── */
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+            font-family: 'DM Mono', monospace;
+            font-size: .9rem;
+        }
+        .empty span { font-size: 2.5rem; display: block; margin-bottom: 12px; }
+
+        /* ── RESPONSIVE ────────────────────────────────────────── */
+        @media (max-width: 700px) {
+            .hero { grid-template-columns: 1fr; gap: 20px; }
+            .breakdown { grid-template-columns: 1fr; }
+            .stats-row { grid-template-columns: repeat(2,1fr); }
+            .scale-grid { grid-template-columns: repeat(3,1fr); }
+        }
+
+        /* ── PRINT ─────────────────────────────────────────────── */
+        @media print {
+            body { background: white; color: black; }
+            body::before { display: none; }
+            .btn-reload { display: none; }
+        }
+
+        /* ── ANIM ──────────────────────────────────────────────── */
+        @keyframes fadeUp {
+            from { opacity:0; transform:translateY(16px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .anim { animation: fadeUp .5s ease both; }
+        .anim-d1 { animation-delay: .1s; }
+        .anim-d2 { animation-delay: .2s; }
+        .anim-d3 { animation-delay: .3s; }
+        .anim-d4 { animation-delay: .4s; }
+    </style>
+</head>
+<body>
+
+<!-- ── DROP ZONE ──────────────────────────────────────────────────────── -->
+<div id="dropZone">
+    <div class="drop-box" id="dropBox" onclick="document.getElementById('fileInput').click()">
+        <span class="drop-logo">🛡️</span>
+        <div class="drop-title">Audit Flash 4.0</div>
+        <p class="drop-sub">Glissez un rapport JSON ici<br>ou cliquez pour charger</p>
+        <button class="drop-btn" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">
+            Charger le rapport
+        </button>
+        <input type="file" id="fileInput" accept=".json">
+    </div>
+</div>
+
+<!-- ── REPORT ─────────────────────────────────────────────────────────── -->
+<div id="report">
+
+    <div class="topbar anim">
+        <div class="topbar-brand">🛡️ Audit Flash 4.0</div>
+        <div style="display:flex;align-items:center;gap:16px;">
+            <div class="topbar-meta" id="topMeta"></div>
+            <button class="btn-reload" onclick="reloadPage()">↩ Nouveau rapport</button>
+        </div>
+    </div>
+
+    <!-- GRADE HERO -->
+    <p class="sec-title anim anim-d1">Cyberscore global</p>
+    <div class="hero anim anim-d1" id="hero">
+        <div class="grade-circle" id="gradeCircle">
+            <span class="grade-letter" id="gradeLetter">—</span>
+        </div>
+        <div class="hero-info">
+            <div class="hero-label" id="heroLabel">—</div>
+            <div class="hero-score" id="heroScore">Score : <strong id="heroScoreVal">—</strong>/100</div>
+            <div class="progress-track">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCORE BREAKDOWN -->
+    <p class="sec-title anim anim-d2">Décomposition du score</p>
+    <div class="breakdown anim anim-d2">
+        <div class="breakdown-card" data-type="gravity">
+            <div>
+                <span class="bk-value" id="bkGravity">—</span>
+                <span class="bk-max"> / 60</span>
+            </div>
+            <div class="bk-label">Gravité</div>
+            <div class="bk-desc" id="bkGravityDesc">pire CVE détecté</div>
+        </div>
+        <div class="breakdown-card" data-type="volume">
+            <div>
+                <span class="bk-value" id="bkVolume">—</span>
+                <span class="bk-max"> / 25</span>
+            </div>
+            <div class="bk-label">Volume CVE</div>
+            <div class="bk-desc" id="bkVolumeDesc">CVE uniques</div>
+        </div>
+        <div class="breakdown-card" data-type="exposure">
+            <div>
+                <span class="bk-value" id="bkExposure">—</span>
+                <span class="bk-max"> / 15</span>
+            </div>
+            <div class="bk-label">Exposition</div>
+            <div class="bk-desc" id="bkExposureDesc">services vulnérables</div>
+        </div>
+    </div>
+
+    <!-- STATS -->
+    <p class="sec-title anim anim-d2">Résumé du scan</p>
+    <div class="stats-row anim anim-d2">
+        <div class="stat-pill">
+            <span class="stat-num" id="sHosts">—</span>
+            <div class="stat-lbl">Hôtes scannés</div>
+        </div>
+        <div class="stat-pill">
+            <span class="stat-num" id="sServices">—</span>
+            <div class="stat-lbl">Services testés</div>
+        </div>
+        <div class="stat-pill">
+            <span class="stat-num" id="sVulns">—</span>
+            <div class="stat-lbl">Vulnérabilités</div>
+        </div>
+        <div class="stat-pill">
+            <span class="stat-num" id="sCves">—</span>
+            <div class="stat-lbl">CVE uniques</div>
+        </div>
+    </div>
+
+    <!-- CVE SEVERITY -->
+    <p class="sec-title anim anim-d3">Répartition des CVE par sévérité</p>
+    <div class="sev-section anim anim-d3">
+        <div class="sev-bars" id="sevBars"></div>
+    </div>
+
+    <!-- VULNERABILITIES -->
+    <p class="sec-title anim anim-d3">Vulnérabilités détectées</p>
+    <div class="vuln-list anim anim-d3" id="vulnList"></div>
+
+    <!-- TOP CVE TABLE -->
+    <div id="cveTableSection" style="display:none;" class="anim anim-d4">
+        <p class="sec-title">Top CVE détectés</p>
+        <div class="cve-table-wrap">
+            <div class="cve-table-header">
+                <span id="cveTableTitle" class="sec-title" style="margin:0;"></span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>CVE ID</th>
+                        <th>Description</th>
+                        <th style="text-align:center;">CVSS</th>
+                        <th>Sévérité</th>
+                        <th>CWE</th>
+                    </tr>
+                </thead>
+                <tbody id="cveTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- GRADE SCALE -->
+    <p class="sec-title anim anim-d4">Grille de notation</p>
+    <div class="scale-grid anim anim-d4" id="scaleGrid"></div>
+
+    <footer class="anim anim-d4">
+        <span id="footerLeft">Audit Flash 4.0 — CVE/CVSS NVD/NIST</span>
+        <span id="footerRight"></span>
+    </footer>
+
+</div>
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+const GRADE_COLORS = {
+    A: '#00e5a0', B: '#38bdf8', C: '#facc15', D: '#fb923c', E: '#f43f5e'
+};
+
+const SEV_COLORS = {
+    CRITICAL: '#f43f5e',
+    HIGH:     '#fb923c',
+    MEDIUM:   '#facc15',
+    LOW:      '#34d399',
+    NONE:     '#64748b',
+    UNKNOWN:  '#64748b',
+};
+
+const SCALE_INFO = [
+    { g:'A', range:'0–19',   col: GRADE_COLORS.A, label:'EXCELLENT',  desc:'Aucun CVE critique,\nrisque minimal' },
+    { g:'B', range:'20–39',  col: GRADE_COLORS.B, label:'BON',        desc:'CVE faibles ou\nmoyens isolés' },
+    { g:'C', range:'40–59',  col: GRADE_COLORS.C, label:'MOYEN',      desc:'CVE HIGH unique\nou accumulation' },
+    { g:'D', range:'60–79',  col: GRADE_COLORS.D, label:'MAUVAIS',    desc:'CVE CRITICAL unique\nou HIGH multiples' },
+    { g:'E', range:'80–100', col: GRADE_COLORS.E, label:'CRITIQUE',   desc:'CRITICAL multiples\nou multi-services' },
+];
+
+function severityFromCvss(score) {
+    if (!score || score === 0) return 'NONE';
+    if (score < 4)  return 'LOW';
+    if (score < 7)  return 'MEDIUM';
+    if (score < 9)  return 'HIGH';
+    return 'CRITICAL';
+}
+
+function cvssColor(score) {
+    return SEV_COLORS[severityFromCvss(score)] || SEV_COLORS.NONE;
+}
+
+function nvdUrl(cveId) {
+    if (!cveId) return '';
+    if (cveId.toUpperCase().startsWith('CVE-'))
+        return 'https://nvd.nist.gov/vuln/detail/' + cveId;
+    if (cveId.toUpperCase().startsWith('CWE-'))
+        return 'https://cwe.mitre.org/data/definitions/' + cveId.split('-')[1] + '.html';
+    return '';
+}
+
+// ── Drag & drop ───────────────────────────────────────────────────────────────
+const dropBox = $('dropBox');
+dropBox.addEventListener('dragover',  e => { e.preventDefault(); dropBox.classList.add('drag-over'); });
+dropBox.addEventListener('dragleave', () => dropBox.classList.remove('drag-over'));
+dropBox.addEventListener('drop', e => {
+    e.preventDefault();
+    dropBox.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) readFile(file);
+});
+$('fileInput').addEventListener('change', e => { if (e.target.files[0]) readFile(e.target.files[0]); });
+
+function readFile(file) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+        try {
+            const data = JSON.parse(ev.target.result);
+            renderReport(data);
+        } catch(err) {
+            alert('Fichier JSON invalide : ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+function reloadPage() {
+    $('report').classList.remove('visible');
+    $('dropZone').classList.remove('hidden');
+    $('fileInput').value = '';
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+function renderReport(data) {
+    // ── 1. Read cyberscore — supports both old and new JSON format ─────────
+    const cs = data.cyberscore || {};
+
+    // New format: cs.final_score / cs.score_breakdown
+    // Old format: cs.total_score / cs.score
+    const finalScore = cs.final_score ?? cs.total_score ?? cs.score ?? 0;
+    const grade      = cs.grade || 'E';
+    const label      = cs.label || '—';
+    const gradeCol   = GRADE_COLORS[grade] || GRADE_COLORS.E;
+
+    // Score breakdown — new format preferred, old as fallback
+    const breakdown  = cs.score_breakdown || {};
+    const bkGravity  = breakdown.base_score_gravity     ?? cs.base_score    ?? null;
+    const bkVolume   = breakdown.volume_score_cve_count ?? cs.volume_score  ?? null;
+    const bkExposure = breakdown.exposure_score_services?? cs.exposure_score?? null;
+
+    // CVE stats
+    const worstCvss  = cs.worst_cvss  ?? 0;
+    const worstSev   = cs.worst_severity || severityFromCvss(worstCvss);
+    const totalCves  = cs.total_cves   ?? data.cve_summary?.total_unique_cves ?? 0;
+    const cveBySev   = cs.cve_by_severity ?? {};
+
+    // Summary
+    const summary    = data.summary || {};
+    const allCves    = data.cve_summary?.all_cves || [];
+
+    // ── 2. Hide drop zone, show report ───────────────────────────────────
+    $('dropZone').classList.add('hidden');
+    $('report').classList.add('visible');
+
+    // ── 3. Topbar meta ────────────────────────────────────────────────────
+    const ts = data.timestamp ? new Date(data.timestamp) : null;
+    $('topMeta').innerHTML =
+        (ts ? ts.toLocaleString('fr-FR') + ' &nbsp;|&nbsp; ' : '') +
+        `v${data.version || '4.0'} &nbsp;|&nbsp; ${(data.system_info?.os || '')} ${data.system_info?.os_version || ''}`;
+    $('footerRight').textContent = ts ? 'Rapport du ' + ts.toLocaleDateString('fr-FR') : '';
+
+    // ── 4. Hero ───────────────────────────────────────────────────────────
+    document.documentElement.style.setProperty('--grade-color', gradeCol);
+    $('gradeCircle').style.borderColor = gradeCol;
+    $('gradeLetter').textContent = grade;
+    $('gradeLetter').style.color = gradeCol;
+    $('heroLabel').textContent   = label;
+    $('heroScoreVal').textContent = finalScore;
+    $('heroScoreVal').style.color = gradeCol;
+    setTimeout(() => { $('progressFill').style.width = finalScore + '%'; }, 100);
+    $('progressFill').style.background = gradeCol;
+
+    // ── 5. Breakdown ──────────────────────────────────────────────────────
+    if (bkGravity !== null) {
+        $('bkGravity').textContent = bkGravity;
+        $('bkGravityDesc').textContent = `CVSS max ${worstCvss} (${worstSev})`;
+    } else {
+        $('bkGravity').textContent = '—';
+        $('bkGravityDesc').textContent = `CVSS max ${worstCvss || '?'} (${worstSev})`;
+    }
+    if (bkVolume !== null) {
+        $('bkVolume').textContent = bkVolume;
+        $('bkVolumeDesc').textContent = `${totalCves} CVE uniques`;
+    } else {
+        $('bkVolume').textContent = '—';
+        $('bkVolumeDesc').textContent = `${totalCves} CVE uniques`;
+    }
+    if (bkExposure !== null) {
+        $('bkExposure').textContent = bkExposure;
+        $('bkExposureDesc').textContent = `${summary.vulnerabilities_found || 0} services vulnérables`;
+    } else {
+        $('bkExposure').textContent = '—';
+        $('bkExposureDesc').textContent = `${summary.vulnerabilities_found || 0} services vulnérables`;
+    }
+
+    // ── 6. Stats ──────────────────────────────────────────────────────────
+    $('sHosts').textContent    = summary.total_hosts    ?? '—';
+    $('sServices').textContent = summary.total_services ?? '—';
+    $('sVulns').textContent    = summary.vulnerabilities_found ?? '—';
+    $('sCves').textContent     = totalCves;
+
+    // ── 7. Severity bars ──────────────────────────────────────────────────
+    const sevBarsEl = $('sevBars');
+    sevBarsEl.innerHTML = '';
+    const sevOrder = ['CRITICAL','HIGH','MEDIUM','LOW'];
+    const maxCount = Math.max(1, ...sevOrder.map(s => cveBySev[s] || 0));
+    sevOrder.forEach(sev => {
+        const count = cveBySev[sev] || 0;
+        const col   = SEV_COLORS[sev];
+        const pct   = (count / maxCount) * 100;
+        const row = document.createElement('div');
+        row.className = 'sev-row';
+        row.innerHTML = `
+            <span class="sev-name" style="color:${col}">${sev}</span>
+            <div class="sev-track">
+                <div class="sev-bar" style="background:${col}" data-pct="${pct}"></div>
+            </div>
+            <span class="sev-count">${count}</span>`;
+        sevBarsEl.appendChild(row);
+    });
+    // animate bars after a tick
+    setTimeout(() => {
+        sevBarsEl.querySelectorAll('.sev-bar').forEach(b => {
+            b.style.width = b.dataset.pct + '%';
+        });
+    }, 150);
+
+    // ── 8. Vulnerabilities ────────────────────────────────────────────────
+    const vulnListEl = $('vulnList');
+    vulnListEl.innerHTML = '';
+    const vulns = (data.vulnerabilities || []).filter(v => v?.test_result?.vulnerable);
+
+    if (!vulns.length) {
+        vulnListEl.innerHTML = '<div class="empty"><span>✅</span>Aucune vulnérabilité détectée</div>';
+    } else {
+        vulns.forEach(vuln => vulnListEl.appendChild(makeVulnCard(vuln)));
+    }
+
+    // ── 9. CVE Table ──────────────────────────────────────────────────────
+    const cves = allCves.length ? allCves : (cs.top_cves || []);
+    if (cves.length) {
+        $('cveTableSection').style.display = 'block';
+        $('cveTableTitle').textContent = `${cves.length} CVE identifié${cves.length > 1 ? 's' : ''}`;
+        const tbody = $('cveTableBody');
+        tbody.innerHTML = '';
+        const sorted = [...cves].sort((a,b) => (b.cvss_v3_score||b.cvss_v2_score||0) - (a.cvss_v3_score||a.cvss_v2_score||0));
+        sorted.slice(0,20).forEach(cve => tbody.appendChild(makeCveRow(cve)));
+    }
+
+    // ── 10. Scale grid ────────────────────────────────────────────────────
+    const scaleGrid = $('scaleGrid');
+    scaleGrid.innerHTML = '';
+    SCALE_INFO.forEach(info => {
+        const card = document.createElement('div');
+        card.className = 'scale-card' + (info.g === grade ? ' active' : '');
+        card.style.setProperty('--g-col', info.col);
+        card.innerHTML = `
+            <div class="g-letter">${info.g}</div>
+            <div class="g-range">${info.range}</div>
+            <div class="g-label">${info.label}</div>
+            <div class="g-desc">${info.desc.replace('\n','<br>')}</div>
+            <div class="active-arrow">▲ VOUS ÊTES ICI</div>`;
+        scaleGrid.appendChild(card);
+    });
+}
+
+// ── Build a vulnerability card ────────────────────────────────────────────────
+function makeVulnCard(vuln) {
+    const t    = vuln.test_result || {};
+    const cves = t.cves || [];
+    const topCve  = cves[0] || null;
+    const topScore = topCve ? (topCve.cvss_v3_score || topCve.cvss_v2_score || 0) : 0;
+    const sev  = topCve ? ((topCve.severity || '').toUpperCase() || severityFromCvss(topScore)) : sevFromType(t.vulnerability_type);
+    const col  = SEV_COLORS[sev] || SEV_COLORS.UNKNOWN;
+
+    const card = document.createElement('div');
+    card.className = 'vuln-card';
+    card.style.setProperty('--sev-color', col);
+
+    // Meta tags
+    let metaTags = `<span class="vuln-tag">Port ${vuln.port || '?'}</span>`;
+    if (vuln.hostname) metaTags += `<span class="vuln-tag">🖥 ${vuln.hostname}</span>`;
+    if (vuln.product)  metaTags += `<span class="vuln-tag">📦 ${vuln.product}${vuln.version ? ' ' + vuln.version : ''}</span>`;
+    if (t.credentials) metaTags += `<span class="vuln-tag" style="color:#f43f5e;">🔑 ${t.credentials}</span>`;
+
+    // CVE chips
+    let chipsHtml = '';
+    if (cves.length) {
+        chipsHtml = `<div class="cve-chips">`;
+        cves.slice(0,6).forEach(c => {
+            const cs = c.cvss_v3_score || c.cvss_v2_score || 0;
+            const cc = SEV_COLORS[severityFromCvss(cs)];
+            const url = c.nvd_url || nvdUrl(c.cve_id);
+            const tag = url ? 'a' : 'div';
+            const linkAttrs = url ? ` href="${url}" target="_blank" rel="noopener noreferrer"` : '';
+            chipsHtml += `
+                <${tag} class="cve-chip" style="--sev-color:${cc}"${linkAttrs}>
+                    <span class="cve-chip-id">${c.cve_id}</span>
+                    <span class="cve-chip-score" style="--chip-col:${cc}">${cs.toFixed(1)}</span>
+                </${tag}>`;
+        });
+        if (cves.length > 6) chipsHtml += `<div class="cve-chip"><span class="cve-chip-id">+${cves.length-6} autres</span></div>`;
+        chipsHtml += `</div>`;
+    }
+
+    card.innerHTML = `
+        <div class="vuln-head">
+            <div class="vuln-badge">${sev}</div>
+            <div class="vuln-service">${t.service || vuln.service || '?'}</div>
+            <div class="vuln-ip">${vuln.ip || ''}${vuln.port ? ':' + vuln.port : ''}</div>
+        </div>
+        <div class="vuln-body">
+            <div class="vuln-details">${(t.details || '').replace(/[🔴🟠🟡🟢⚪]/g,'').trim()}</div>
+            <div class="vuln-meta">${metaTags}</div>
+            ${chipsHtml}
+        </div>`;
+    return card;
+}
+
+// ── Build a CVE table row ─────────────────────────────────────────────────────
+function makeCveRow(cve) {
+    const score  = cve.cvss_v3_score || cve.cvss_v2_score || 0;
+    const sev    = (cve.severity || '').toUpperCase() || severityFromCvss(score);
+    const col    = SEV_COLORS[sev] || SEV_COLORS.UNKNOWN;
+    const cweStr = (cve.cwe_ids || []).slice(0,2).join(', ') || '—';
+    const desc   = (cve.description || '').substring(0, 160) + (cve.description?.length > 160 ? '…' : '');
+
+    const url = cve.nvd_url || nvdUrl(cve.cve_id);
+    const idHtml = url
+        ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="cve-link">${cve.cve_id}</a>`
+        : cve.cve_id;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="td-id">${idHtml}</td>
+        <td class="td-desc">${desc}</td>
+        <td class="td-score">
+            <span class="score-pill" style="background:color-mix(in srgb,${col} 18%,transparent);color:${col}">${score.toFixed(1)}</span>
+        </td>
+        <td class="td-sev">
+            <span class="sev-dot">
+                <span class="dot" style="background:${col}"></span>
+                <span style="color:${col}">${sev}</span>
+            </span>
+        </td>
+        <td><span style="font-family:'DM Mono',monospace;font-size:.75rem;color:var(--muted)">${cweStr}</span></td>`;
+    return tr;
+}
+
+// ── Severity from legacy vuln type (fallback for old reports) ─────────────────
+function sevFromType(type) {
+    const CRITICAL = ['ftp_anonymous','telnet_exposed','smb_null_session','ldap_anonymous','smb_v1','redis_no_auth'];
+    const HIGH     = ['ssh_default_creds','rdp_exposed','mysql_no_password','mongodb_no_auth','smb_guest_access'];
+    const MEDIUM   = ['http_sensitive_paths','dns_zone_transfer','smtp_open_relay','vnc_exposed'];
+    if (CRITICAL.includes(type)) return 'CRITICAL';
+    if (HIGH.includes(type))     return 'HIGH';
+    if (MEDIUM.includes(type))   return 'MEDIUM';
+    return 'LOW';
+}
+</script>
+
+<script>
+// ── Auto-render : données injectées par Audit Flash 
+(function() {
+    const _AF_DATA = {"timestamp": "2026-03-05T11:53:18.706509", "version": "4.0", "system_info": {"os": "Windows", "os_version": "11", "python_version": "3.14.3"}, "cyberscore": {"grade": "D", "label": "MAUVAIS", "final_score": 70, "score_breakdown": {"base_score_gravity": 60, "volume_score_cve_count": 10, "exposure_score_services": 0, "max_possible": 100, "note": "gravité(0-60) + volume_CVE(0-25) + nb_services(0-15)"}, "worst_cvss": 9.8, "worst_severity": "CRITICAL", "total_cves": 2, "cve_by_severity": {"CRITICAL": 2, "HIGH": 0, "MEDIUM": 0, "LOW": 0}, "total_vulnerabilities": 1}, "cve_summary": {"total_unique_cves": 2, "critical_cves": 2, "high_cves": 0, "medium_cves": 0, "low_cves": 0, "all_cves": [{"cve_id": "CVE-2019-0708", "description": "BlueKeep - Remote Desktop Services Remote Code Execution (pre-auth).", "cvss_v3_score": 9.8, "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "cvss_v2_score": 0.0, "severity": "CRITICAL", "published": "2019-05-14", "modified": "", "references": ["https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-0708"], "affected_products": [], "cwe_ids": ["CWE-416"], "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2019-0708"}, {"cve_id": "CVE-2019-1181", "description": "DejaBlue - Remote Desktop Services Remote Code Execution.", "cvss_v3_score": 9.8, "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "cvss_v2_score": 0.0, "severity": "CRITICAL", "published": "2019-08-13", "modified": "", "references": [], "affected_products": [], "cwe_ids": ["CWE-416"], "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2019-1181"}]}, "summary": {"total_hosts": 1, "total_services": 3, "vulnerabilities_found": 1, "vulnerabilities_by_type": {"rdp_exposed": 1}}, "vulnerabilities": [{"ip": "127.0.0.1", "hostname": "", "port": 3389, "service": "ms-wbt-server", "test_result": {"service": "RDP", "vulnerable": true, "vulnerability_type": "rdp_exposed", "details": "🟠 MAUVAIS: RDP exposé (risque BlueKeep/brute force) | 🔴 CVE: CVE-2019-0708 (CVSS: 9.8)", "cves": [{"cve_id": "CVE-2019-0708", "description": "BlueKeep - Remote Desktop Services Remote Code Execution (pre-auth).", "cvss_v3_score": 9.8, "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "cvss_v2_score": 0.0, "severity": "CRITICAL", "published": "2019-05-14", "modified": "", "references": ["https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-0708"], "affected_products": [], "cwe_ids": ["CWE-416"], "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2019-0708"}, {"cve_id": "CVE-2019-1181", "description": "DejaBlue - Remote Desktop Services Remote Code Execution.", "cvss_v3_score": 9.8, "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "cvss_v2_score": 0.0, "severity": "CRITICAL", "published": "2019-08-13", "modified": "", "references": [], "affected_products": [], "cwe_ids": ["CWE-416"], "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2019-1181"}], "cve_count": 2, "max_cvss": 9.8, "top_cve_id": "CVE-2019-0708"}}], "all_results": [{"ip": "127.0.0.1", "hostname": "", "port": 445, "service": "microsoft-ds", "test_result": {"service": "SMB", "vulnerable": false, "vulnerability_type": null, "details": "Module pysmb non installé (pip install pysmb)", "shares": [], "cves": []}}, {"ip": "127.0.0.1", "hostname": "", "port": 3389, "service": "ms-wbt-server", "test_result": {"service": "RDP", "vulnerable": true, "vulnerability_type": "rdp_exposed", "details": "🟠 MAUVAIS: RDP exposé (risque BlueKeep/brute force) | 🔴 CVE: CVE-2019-0708 (CVSS: 9.8)", "cves": [{"cve_id": "CVE-2019-0708", "description": "BlueKeep - Remote Desktop Services Remote Code Execution (pre-auth).", "cvss_v3_score": 9.8, "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "cvss_v2_score": 0.0, "severity": "CRITICAL", "published": "2019-05-14", "modified": "", "references": ["https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-0708"], "affected_products": [], "cwe_ids": ["CWE-416"], "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2019-0708"}, {"cve_id": "CVE-2019-1181", "description": "DejaBlue - Remote Desktop Services Remote Code Execution.", "cvss_v3_score": 9.8, "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "cvss_v2_score": 0.0, "severity": "CRITICAL", "published": "2019-08-13", "modified": "", "references": [], "affected_products": [], "cwe_ids": ["CWE-416"], "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2019-1181"}], "cve_count": 2, "max_cvss": 9.8, "top_cve_id": "CVE-2019-0708"}}, {"ip": "127.0.0.1", "hostname": "", "port": 135, "service": "epmap", "test_result": {"service": "epmap", "vulnerable": false, "vulnerability_type": "service_detected", "details": "Service epmap détecté", "cves": []}}], "vlan_discovery": {"enabled": false, "vlans_found": 0, "vlans": []}};
+    // Masquer la drop zone et afficher le rapport directement
+    document.addEventListener("DOMContentLoaded", function() {
+        renderReport(_AF_DATA);
+        // Masquer le bouton "Nouveau rapport" (inutile en mode autonome)
+        var btn = document.querySelector(".btn-reload");
+        if (btn) btn.style.display = "none";
+    });
+})();
+</script>
+</body>
+</html>

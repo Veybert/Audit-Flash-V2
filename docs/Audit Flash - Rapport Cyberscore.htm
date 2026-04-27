@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="fr"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Flash - Rapport Cyberscore</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .cyberscore-card {
+            padding: 40px;
+            text-align: center;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .score-display {
+            display: inline-block;
+            background: white;
+            border-radius: 50%;
+            width: 200px;
+            height: 200px;
+            line-height: 200px;
+            font-size: 5em;
+            font-weight: bold;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin: 20px 0;
+        }
+
+        .score-A { color: #198754; border: 5px solid #198754; }
+        .score-B { color: #0dcaf0; border: 5px solid #0dcaf0; }
+        .score-C { color: #ffc107; border: 5px solid #ffc107; }
+        .score-D { color: #fd7e14; border: 5px solid #fd7e14; }
+        .score-E { color: #dc3545; border: 5px solid #dc3545; }
+
+        .score-label {
+            font-size: 1.8em;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .score-details {
+            font-size: 1.1em;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .section {
+            padding: 40px;
+        }
+
+        .section h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            color: #1e3c72;
+            border-bottom: 3px solid #1e3c72;
+            padding-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .stat-card h3 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .stat-card p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .vulnerability-list {
+            margin-top: 20px;
+        }
+
+        .vulnerability-item {
+            background: #f8f9fa;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #dc3545;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .vulnerability-item.critical { border-left-color: #dc3545; }
+        .vulnerability-item.high { border-left-color: #fd7e14; }
+        .vulnerability-item.medium { border-left-color: #ffc107; }
+        .vulnerability-item.low { border-left-color: #0dcaf0; }
+
+        .vulnerability-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .vulnerability-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+
+        .vulnerability-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            color: white;
+        }
+
+        .badge-critical { background: #dc3545; }
+        .badge-high { background: #fd7e14; }
+        .badge-medium { background: #ffc107; color: #333; }
+        .badge-low { background: #0dcaf0; }
+
+        .vulnerability-details {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .vulnerability-meta {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        .scale-legend {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .scale-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .scale-item:last-child {
+            border-bottom: none;
+        }
+
+        .scale-icon {
+            font-size: 2em;
+            margin-right: 15px;
+            width: 40px;
+            text-align: center;
+        }
+
+        .scale-info {
+            flex: 1;
+        }
+
+        .scale-grade {
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .scale-range {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .upload-section {
+            text-align: center;
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .upload-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2em;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+        }
+
+        .upload-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(0,0,0,0.3);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .footer {
+            background: #1e3c72;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+            .upload-section {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ Audit Flash - Rapport Cyberscore</h1>
+            <p>Évaluation de la sécurité réseau</p>
+        </div>
+
+        <div class="upload-section" id="uploadSection" style="display: none;">
+            <h2>Charger un Rapport JSON</h2>
+            <p style="margin: 20px 0; color: #666;">Sélectionnez un fichier de rapport généré par Audit Flash</p>
+            <button class="upload-button" onclick="document.getElementById('fileInput').click()">
+                📁 Charger le Rapport
+            </button>
+            <input type="file" id="fileInput" accept=".json" onchange="loadReport(event)">
+        </div>
+
+        <div id="reportContent" style="display: block;">
+            <div class="cyberscore-card">
+                <h2>Cyberscore Global</h2>
+                <div class="score-display score-A" id="scoreDisplay">A</div>
+                <div class="score-label" id="scoreLabel">🟢 EXCELLENT</div>
+                <div class="score-details" id="scoreDetails">
+                    Score de sévérité: <strong id="scoreValue">0</strong>/100
+                </div>
+                <p style="margin-top: 20px; color: #666;">
+                    Date: <span id="reportDate">13/01/2026 15:22:04</span>
+                </p>
+            </div>
+
+            <div class="section">
+                <h2>📊 Statistiques</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3 id="statHosts">1</h3>
+                        <p>Hôtes Scannés</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="statServices">3</h3>
+                        <p>Services Détectés</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="statVulns">0</h3>
+                        <p>Vulnérabilités</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="statScore">0</h3>
+                        <p>Score Total</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🔴 Vulnérabilités Détectées</h2>
+                <div id="vulnerabilityList" class="vulnerability-list"><p style="text-align: center; padding: 40px; color: #198754; font-size: 1.3em;">✅ Aucune vulnérabilité détectée</p></div>
+            </div>
+
+            <div class="section">
+                <h2>📏 Échelle de Notation</h2>
+                <div class="scale-legend">
+                    <div class="scale-item">
+                        <div class="scale-icon">🟢</div>
+                        <div class="scale-info">
+                            <div class="scale-grade" style="color: #198754;">A - EXCELLENT</div>
+                            <div class="scale-range">0-29 points | Sécurité optimale</div>
+                        </div>
+                    </div>
+                    <div class="scale-item">
+                        <div class="scale-icon">🔵</div>
+                        <div class="scale-info">
+                            <div class="scale-grade" style="color: #0dcaf0;">B - BON</div>
+                            <div class="scale-range">30-49 points | Bonne sécurité</div>
+                        </div>
+                    </div>
+                    <div class="scale-item">
+                        <div class="scale-icon">🟡</div>
+                        <div class="scale-info">
+                            <div class="scale-grade" style="color: #ffc107;">C - MOYEN</div>
+                            <div class="scale-range">50-69 points | Failles de sécurité notables</div>
+                        </div>
+                    </div>
+                    <div class="scale-item">
+                        <div class="scale-icon">🟠</div>
+                        <div class="scale-info">
+                            <div class="scale-grade" style="color: #fd7e14;">D - MAUVAIS</div>
+                            <div class="scale-range">70-89 points | Risques importants</div>
+                        </div>
+                    </div>
+                    <div class="scale-item">
+                        <div class="scale-icon">🔴</div>
+                        <div class="scale-info">
+                            <div class="scale-grade" style="color: #dc3545;">E - CRITIQUE</div>
+                            <div class="scale-range">90-100 points | Vulnérabilités critiques</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Audit Flash v3.0 - Windows Edition avec Cyberscore</p>
+            <p style="margin-top: 5px; opacity: 0.8; font-size: 0.9em;">
+                Généré le <span id="footerDate">13/01/2026</span>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function loadReport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    displayReport(data);
+                } catch (error) {
+                    alert('Erreur lors du chargement du fichier: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function displayReport(data) {
+            // Masquer la section upload
+            document.getElementById('uploadSection').style.display = 'none';
+            document.getElementById('reportContent').style.display = 'block';
+
+            // Cyberscore
+            const score = data.cyberscore;
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            scoreDisplay.textContent = score.grade;
+            scoreDisplay.className = 'score-display score-' + score.grade;
+            
+            document.getElementById('scoreLabel').textContent = score.emoji + ' ' + score.label;
+            document.getElementById('scoreValue').textContent = score.score;
+
+            // Date
+            const date = new Date(data.timestamp);
+            document.getElementById('reportDate').textContent = date.toLocaleString('fr-FR');
+            document.getElementById('footerDate').textContent = date.toLocaleDateString('fr-FR');
+
+            // Stats
+            document.getElementById('statHosts').textContent = data.summary.total_hosts;
+            document.getElementById('statServices').textContent = data.summary.total_services;
+            document.getElementById('statVulns').textContent = data.summary.vulnerabilities_found;
+            document.getElementById('statScore').textContent = score.total_score;
+
+            // Vulnérabilités
+            const vulnList = document.getElementById('vulnerabilityList');
+            vulnList.innerHTML = '';
+
+            if (data.vulnerabilities && data.vulnerabilities.length > 0) {
+                data.vulnerabilities.forEach(vuln => {
+                    const item = createVulnerabilityItem(vuln);
+                    vulnList.appendChild(item);
+                });
+            } else {
+                vulnList.innerHTML = '<p style="text-align: center; padding: 40px; color: #198754; font-size: 1.3em;">✅ Aucune vulnérabilité détectée</p>';
+            }
+        }
+
+        function createVulnerabilityItem(vuln) {
+            const div = document.createElement('div');
+            const severity = getSeverityClass(vuln.test_result.vulnerability_type);
+            div.className = 'vulnerability-item ' + severity.class;
+
+            div.innerHTML = `
+                <div class="vulnerability-header">
+                    <div class="vulnerability-title">
+                        ${vuln.service} - ${vuln.ip}
+                    </div>
+                    <div class="vulnerability-badge ${severity.badgeClass}">
+                        ${severity.label}
+                    </div>
+                </div>
+                <div class="vulnerability-details">
+                    ${vuln.test_result.details}
+                </div>
+                <div class="vulnerability-meta">
+                    <span>📍 Port: ${vuln.port}</span>
+                    ${vuln.hostname ? `<span>🖥️ Host: ${vuln.hostname}</span>` : ''}
+                    ${vuln.product ? `<span>📦 ${vuln.product} ${vuln.version || ''}</span>` : ''}
+                </div>
+            `;
+
+            return div;
+        }
+
+        function getSeverityClass(vulnType) {
+            const criticalTypes = ['ftp_anonymous', 'telnet_exposed', 'smb_null_session', 'ldap_anonymous'];
+            const highTypes = ['ssh_default_creds', 'rdp_exposed', 'mysql_no_password', 'redis_no_auth', 'mongodb_no_auth', 'smb_guest_access'];
+            const mediumTypes = ['http_sensitive_paths', 'dns_zone_transfer', 'smtp_open_relay', 'vnc_exposed'];
+
+            if (criticalTypes.includes(vulnType)) {
+                return { class: 'critical', badgeClass: 'badge-critical', label: 'CRITIQUE' };
+            } else if (highTypes.includes(vulnType)) {
+                return { class: 'high', badgeClass: 'badge-high', label: 'ÉLEVÉ' };
+            } else if (mediumTypes.includes(vulnType)) {
+                return { class: 'medium', badgeClass: 'badge-medium', label: 'MOYEN' };
+            } else {
+                return { class: 'low', badgeClass: 'badge-low', label: 'FAIBLE' };
+            }
+        }
+    </script>
+
+
+</body></html>
