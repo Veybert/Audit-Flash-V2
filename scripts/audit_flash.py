@@ -606,13 +606,7 @@ class CVEDatabase:
                 # Mettre en cache (y compris None pour éviter de re-fetcher un CVE inexistant)
                 self.cache[cache_key] = {'entry': entry, 'fetched_at': time.time()}
                 if entry:
-                    score_display = entry.cvss_v3_score or entry.cvss_v2_score
-                    if score_display > 0.0:
-                        logging.info("[NVD] %s : CVSSv3=%.1f | Severity=%s",
-                                     cve_id, entry.cvss_v3_score, entry.severity)
-                    else:
-                        # CVE récent ou pas encore scoré par NVD — on retourne quand même l'entrée
-                        logging.warning("[NVD] %s : pas de score CVSS (CVE récent ou réservé)", cve_id)
+                    # Suppression des messages NVD dans le terminal
                     return entry
                 return None
 
@@ -3645,7 +3639,7 @@ class AuditFlashWindows:
                 'vulnerabilities_found': len(vulnerabilities),
                 'vulnerabilities_by_type': cyberscore['vulnerability_counts']
             },
-            'vulnerabilities': vulnerabilities,
+            'resultats_tests': vulnerabilities,
             'all_results': self.results,
             'vlan_discovery': {
                 'enabled': self.discover_vlans,
@@ -3667,8 +3661,8 @@ class AuditFlashWindows:
             report['cve_summary']['top_cves'] = _filter_cves(report['cve_summary']['top_cves'])
         if 'nse_cves' in report['cve_summary']:
             report['cve_summary']['nse_cves'] = _filter_cves(report['cve_summary']['nse_cves'])
-        if 'vulnerabilities' in report:
-            for v in report['vulnerabilities']:
+        if 'resultats_tests' in report:
+            for v in report['resultats_tests']:
                 if 'cves' in v.get('test_result', {}):
                     v['test_result']['cves'] = _filter_cves(v['test_result']['cves'])
 

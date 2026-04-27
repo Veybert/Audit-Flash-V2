@@ -746,7 +746,7 @@
     </div>
 
     <!-- VULNERABILITIES -->
-    <p class="sec-title anim anim-d3">Vulnérabilités détectées</p>
+    <p class="sec-title anim anim-d3">Résultats des tests</p>
     <div class="vuln-list anim anim-d3" id="vulnList"></div>
 
     <!-- TOP CVE TABLE -->
@@ -998,10 +998,10 @@ function renderReport(data) {
     // ── 8. Vulnerabilities ────────────────────────────────────────────────
     const vulnListEl = $('vulnList');
     vulnListEl.innerHTML = '';
-    const vulns = (data.vulnerabilities || []).filter(v => v?.test_result?.vulnerable);
+    const vulns = (data.resultats_tests || data.vulnerabilities || []).filter(v => v?.test_result?.vulnerable);
 
     if (!vulns.length) {
-        vulnListEl.innerHTML = '<div class="empty"><span>✅</span>Aucune vulnérabilité détectée</div>';
+        vulnListEl.innerHTML = '<div class="empty"><span>✅</span>Aucune vulnérabilité courante détectée</div>';
     } else {
         vulns.forEach(vuln => vulnListEl.appendChild(makeVulnCard(vuln)));
     }
