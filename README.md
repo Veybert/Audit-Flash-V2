@@ -244,11 +244,9 @@ python audit_flash.py -t 127.0.0.1 --profile top-10 --cve-cache cve_cache_phase2
 - Double click on `report.html` or `report.pdf`
 - See your Cyberscore in your browser or you PDF viewer 🟢🟠🔴
 
-## 🤝 Authors - Contributors
-3 students in Third year of bachelor's degree in cyber studies 👨‍🎓
+## 🤝 Author - Contributors
+A student in Third year of bachelor's degree in cyber studies 👨‍🎓
 - **Bertrand VEY** _alias_ [@Veybert](https://github.com/Veybert)
-- **Titouan TUPINIER** _alias_ [@Raisin](https://github.com/Raisin-ArchiSec)
-- **Eliot GLEYSE** _alias_ [@Eglzz](https://github.com/Eglzz)
 
 🪜Any external contributions to the project that help improve and optimize its use are welcome. Feel free to :
 - Add tests for other services
