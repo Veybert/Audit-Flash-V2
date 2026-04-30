@@ -20,3 +20,4 @@ pymongo>=4.6.0
 psycopg2-binary>=2.9.0
 pymssql>=2.2.0
 pysnmp>=6.0.0
+telnetlib3

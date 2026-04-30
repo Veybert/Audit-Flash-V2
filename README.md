@@ -140,10 +140,12 @@ python audit_flash.py -h
 | `--list-profiles` | Display all available profiles and exit |
 | `-p`, `--ports` | Ports to scan (ignored if `--profile` is used) |
 | `-o`, `--output` | Output JSON file (default: `audit_report_cve.json`) |
+| `--output-dir` | Output directory for reports (default: `reports/`) |
 | `--timeout` | Timeout in seconds (default depends on profile) |
 | `--threads` | Number of threads (default depends on profile) |
 | `--no-nmap` | Disable Nmap, use basic socket scan |
 | `--domain DOMAIN` | Domain name for DNS zone transfer test |
+| `--yes-large-cidr` | Auto-accept CIDR targets larger than 256 hosts (no interactive prompt) |
 
 ### NSE Scripts (Nmap Scripting Engine)
 
@@ -190,7 +192,7 @@ python audit_flash.py -h
 | :--- | :--- |
 | `--discover-vlans` | Enable VLAN discovery via CDP/LLDP (root/admin required) |
 | `-i`, `--interface` | Network interface for VLAN discovery (e.g. eth0, Ethernet) |
-| `--vlan-timeout` | VLAN discovery timeout in seconds (default: 30) |
+| `--vlan-timeout` | VLAN discovery timeout in seconds (default: 65) |
 
 ### Scan profiles
 
@@ -216,6 +218,9 @@ python audit_flash.py -t 192.168.1.100 --nse smb-vuln ssl
 # Scan a whole network with windows profile
 python audit_flash.py -t 192.168.1.0/24 --profile windows
 
+# Scan a large CIDR without confirmation prompt
+python audit_flash.py -t 192.168.0.0/16 --profile top-20 --yes-large-cidr
+
 # Offline mode — local CPE database only, no Nmap
 python audit_flash.py -t 192.168.1.100 --no-cve-api --no-nmap
 
@@ -224,6 +229,15 @@ python audit_flash.py -t 192.168.1.100 --profile windows --discover-vlans
 
 # Generate PDF and HTML reports
 python audit_flash.py -t 192.168.1.100 --script-scan --profile top-100 --pdf report.pdf --html report.html
+
+# Save reports in a dedicated folder
+python audit_flash.py -t 192.168.1.100 --profile top-100 --output-dir reports_clientA -o audit_clientA.json
+
+# Cache warm-up run (clear then rebuild cache)
+python audit_flash.py -t 127.0.0.1 --profile top-10 --cve-cache cve_cache_phase2.json --clear-cve-cache -o phase2_run1.json
+
+# Cache reuse run (should be faster / fewer API calls)
+python audit_flash.py -t 127.0.0.1 --profile top-10 --cve-cache cve_cache_phase2.json -o phase2_run2.json
 ```
 
 2. Open your result :

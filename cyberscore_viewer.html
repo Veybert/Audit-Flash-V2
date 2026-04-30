@@ -21,9 +21,9 @@
             --grade-D: #ea580c;
             --grade-E: #ef4444;
 
-            --sev-critical: #ef4444;
-            --sev-high:     #f97316;
-            --sev-medium:   #d97706;
+            --sev-critical: #000000;
+            --sev-high:     #ef4444;
+            --sev-medium:   #f97316;
             --sev-low:      #10b981;
             --sev-none:     #64748b;
         }
@@ -151,6 +151,22 @@
         }
         .btn-reload:hover { border-color: var(--text); color: var(--text); }
 
+        /* Mascot */
+        .mascot-wrap {
+            display: flex;
+            justify-content: center;
+            margin: -10px 0 24px;
+        }
+        .mascot-img {
+            width: min(180px, 34vw);
+            max-width: 180px;
+            min-width: 96px;
+            height: auto;
+            filter: drop-shadow(0 6px 12px rgba(2, 6, 23, .20));
+            user-select: none;
+            pointer-events: none;
+        }
+
         /* ── SECTION TITLE ─────────────────────────────────────── */
         .sec-title {
             font-size: 1rem;
@@ -211,9 +227,18 @@
             font-family: 'DM Mono', monospace;
             font-size: 1rem;
             color: var(--muted);
-            margin-bottom: 20px;
+            margin-bottom: 8px;
         }
         .hero-score strong { color: var(--grade-color, var(--grade-A)); }
+        .hero-smart {
+            font-family: 'DM Mono', monospace;
+            font-size: .9rem;
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+        .hero-smart strong {
+            color: var(--heading);
+        }
 
         /* Progress bar */
         .progress-track {
@@ -235,7 +260,7 @@
         /* ── SCORE BREAKDOWN ───────────────────────────────────── */
         .breakdown {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 16px;
             margin-bottom: 32px;
         }
@@ -258,6 +283,7 @@
         .breakdown-card[data-type="gravity"]   { --accent: var(--sev-critical); }
         .breakdown-card[data-type="volume"]    { --accent: var(--grade-B); }
         .breakdown-card[data-type="exposure"]  { --accent: var(--sev-medium); }
+        .breakdown-card[data-type="cvssmax"]   { --accent: var(--grade-D); }
 
         .bk-value {
             font-family: 'DM Mono', monospace;
@@ -621,6 +647,9 @@
         .empty span { font-size: 2.5rem; display: block; margin-bottom: 12px; }
 
         /* ── RESPONSIVE ────────────────────────────────────────── */
+        @media (max-width: 1100px) {
+            .breakdown { grid-template-columns: repeat(2,1fr); }
+        }
         @media (max-width: 700px) {
             .hero { grid-template-columns: 1fr; gap: 20px; }
             .breakdown { grid-template-columns: 1fr; }
@@ -654,7 +683,7 @@
 <div id="dropZone">
     <div class="drop-box" id="dropBox" onclick="document.getElementById('fileInput').click()">
         <span class="drop-logo">🛡️</span>
-        <div class="drop-title">Audit Flash 4.0</div>
+        <div class="drop-title">Audit Flash</div>
         <p class="drop-sub">Glissez un rapport JSON ici<br>ou cliquez pour charger</p>
         <button class="drop-btn" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">
             Charger le rapport
@@ -667,11 +696,14 @@
 <div id="report">
 
     <div class="topbar anim">
-        <div class="topbar-brand">🛡️ Audit Flash 4.0</div>
+        <div class="topbar-brand">Audit Flash</div>
         <div style="display:flex;align-items:center;gap:16px;">
             <div class="topbar-meta" id="topMeta"></div>
             <button class="btn-reload" onclick="reloadPage()">↩ Nouveau rapport</button>
         </div>
+    </div>
+    <div class="mascot-wrap anim anim-d1">
+        <img id="reportMascot" class="mascot-img" alt="Mascotte Audit Flash">
     </div>
 
     <!-- GRADE HERO -->
@@ -716,6 +748,14 @@
             <div class="bk-label">Exposition</div>
             <div class="bk-desc" id="bkExposureDesc">services vulnérables</div>
         </div>
+        <div class="breakdown-card" data-type="cvssmax">
+            <div>
+                <span class="bk-value" id="bkCvssMax">—</span>
+                <span class="bk-max"> / 10</span>
+            </div>
+            <div class="bk-label">Bonus CVSS max</div>
+            <div class="bk-desc" id="bkCvssMaxDesc">pire CVSS observé</div>
+        </div>
     </div>
 
     <!-- STATS -->
@@ -736,6 +776,52 @@
         <div class="stat-pill">
             <span class="stat-num" id="sCves">—</span>
             <div class="stat-lbl">CVE uniques</div>
+        </div>
+    </div>
+
+    <!-- EXECUTIVE SUMMARY -->
+    <div id="execSummarySection" class="anim anim-d3" style="display:none;">
+        <p class="sec-title">Synthèse Exécutive</p>
+        <div class="cve-table-wrap" style="margin-bottom:16px;">
+            <div class="cve-table-header">
+                <span class="sec-title" style="margin:0;" id="execTotalsTitle">Vue globale</span>
+            </div>
+            <div style="padding:14px 16px;font-family:'DM Mono',monospace;font-size:.82rem;color:var(--muted);" id="execTotalsBody"></div>
+        </div>
+
+        <div class="cve-table-wrap" style="margin-bottom:16px;">
+            <div class="cve-table-header">
+                <span class="sec-title" style="margin:0;">Top CVE Prioritaires</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>CVE</th>
+                        <th>CVSS</th>
+                        <th>Sévérité</th>
+                        <th>Hôtes impactés</th>
+                        <th>Services</th>
+                    </tr>
+                </thead>
+                <tbody id="execTopCvesBody"></tbody>
+            </table>
+        </div>
+
+        <div class="cve-table-wrap" style="margin-bottom:24px;">
+            <div class="cve-table-header">
+                <span class="sec-title" style="margin:0;">Top Hôtes à traiter</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>IP</th>
+                        <th>OS</th>
+                        <th>Total CVE</th>
+                        <th>Worst CVSS</th>
+                    </tr>
+                </thead>
+                <tbody id="execTopHostsBody"></tbody>
+            </table>
         </div>
     </div>
 
@@ -776,7 +862,7 @@
     <div class="scale-grid anim anim-d4" id="scaleGrid"></div>
 
     <footer class="anim anim-d4">
-        <span id="footerLeft">Audit Flash 4.0 — CVE/CVSS NVD/NIST</span>
+        <span id="footerLeft">Audit Flash — CVE/CVSS NVD/NIST</span>
         <span id="footerRight"></span>
     </footer>
 
@@ -791,9 +877,9 @@ const GRADE_COLORS = {
 };
 
 const SEV_COLORS = {
-    CRITICAL: '#ef4444',
-    HIGH:     '#f97316',
-    MEDIUM:   '#d97706',
+    CRITICAL: '#000000',
+    HIGH:     '#ef4444',
+    MEDIUM:   '#f97316',
     LOW:      '#10b981',
     NONE:     '#64748b',
     UNKNOWN:  '#64748b',
@@ -808,15 +894,80 @@ const SCALE_INFO = [
 ];
 
 function severityFromCvss(score) {
-    if (!score || score === 0) return 'NONE';
-    if (score < 4)  return 'LOW';
-    if (score < 7)  return 'MEDIUM';
-    if (score < 9)  return 'HIGH';
+    const s = Number(score || 0);
+    if (s <= 0) return 'NONE';
+    if (s <= 3.9) return 'LOW';
+    if (s <= 6.9) return 'MEDIUM';
+    if (s <= 8.9) return 'HIGH';
     return 'CRITICAL';
 }
 
 function cvssColor(score) {
     return SEV_COLORS[severityFromCvss(score)] || SEV_COLORS.NONE;
+}
+
+function normalizedSeverity(cve) {
+    const score = Number(cve?.cvss_v3_score || cve?.cvss_v2_score || 0);
+    const raw = String(cve?.severity || '').trim().toUpperCase();
+    if (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(raw)) return raw;
+    return severityFromCvss(score);
+}
+
+function severityStatsFromCves(cves) {
+    const stats = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+    (cves || []).forEach(cve => {
+        const sev = normalizedSeverity(cve);
+        if (stats[sev] !== undefined) stats[sev] += 1;
+    });
+    return stats;
+}
+
+function severityStatsFromScanResults(allResults, cveLookupById) {
+    const stats = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+    let total = 0;
+    (allResults || []).forEach(r => {
+        const t = r?.test_result || {};
+        const seenInThisResult = new Set();
+        (t.cves || []).forEach(cve => {
+            const id = cve?.cve_id || '';
+            if (id && seenInThisResult.has(id)) return;
+            const sev = normalizedSeverity(cve);
+            if (stats[sev] !== undefined) {
+                stats[sev] += 1;
+                total += 1;
+                if (id) seenInThisResult.add(id);
+            }
+        });
+        (t.cpe_cves || []).forEach(cveId => {
+            if (!cveId || seenInThisResult.has(cveId)) return;
+            const cve = cveLookupById.get(cveId);
+            if (!cve) return;
+            const sev = normalizedSeverity(cve);
+            if (stats[sev] !== undefined) {
+                stats[sev] += 1;
+                total += 1;
+                seenInThisResult.add(cveId);
+            }
+        });
+    });
+    return { stats, total };
+}
+
+function inferHostOs(ip, allResults) {
+    const rows = (allResults || []).filter(r => String(r?.ip || '') === String(ip || ''));
+    const blob = rows.map(r => {
+        const t = r?.test_result || {};
+        return [
+            r?.service, r?.product, r?.version,
+            t?.service, t?.product, t?.version,
+            t?.details
+        ].filter(Boolean).join(' ').toLowerCase();
+    }).join(' ');
+
+    if (!blob) return 'Inconnu';
+    if (/(microsoft|windows|msrpc|netbios|microsoft-ds|winrm|iis|rdp|ms-wbt-server)/.test(blob)) return 'Windows';
+    if (/(linux|ubuntu|debian|centos|red hat|samba|openssh|apache|nginx)/.test(blob)) return 'Linux';
+    return 'Inconnu';
 }
 
 function nvdUrl(cveId) {
@@ -859,6 +1010,31 @@ function reloadPage() {
     $('fileInput').value = '';
 }
 
+function resolveMascotImage() {
+    const img = $('reportMascot');
+    if (!img) return;
+
+    const candidates = [
+        './images/af.png',
+        '../images/af.png',
+        '../../images/af.png',
+        './af.png',
+        '../af.png',
+        '../../af.png'
+    ];
+
+    let idx = 0;
+    const tryNext = () => {
+        if (idx >= candidates.length) {
+            img.style.display = 'none';
+            return;
+        }
+        img.src = candidates[idx++];
+    };
+    img.onerror = tryNext;
+    tryNext();
+}
+
 // ── Main render ───────────────────────────────────────────────────────────────
 function renderReport(data) {
     // ── 1. Read cyberscore — supports both old and new JSON format ─────────
@@ -876,15 +1052,18 @@ function renderReport(data) {
     const bkGravity  = breakdown.base_score_gravity     ?? cs.base_score    ?? null;
     const bkVolume   = breakdown.volume_score_cve_count ?? cs.volume_score  ?? null;
     const bkExposure = breakdown.exposure_score_services?? cs.exposure_score?? null;
+    const bkCvssMax  = breakdown.cvss_max_bonus         ?? cs.cvss_max_score ?? null;
 
     // CVE stats
     const worstCvss  = cs.worst_cvss  ?? 0;
     const worstSev   = cs.worst_severity || severityFromCvss(worstCvss);
-    const totalCves  = cs.total_cves   ?? data.cve_summary?.total_unique_cves ?? 0;
-    const cveBySev   = cs.cve_by_severity ?? {};
+    let totalCves  = cs.total_cves   ?? data.cve_summary?.total_unique_cves ?? 0;
+    let cveBySev   = cs.cve_by_severity ?? {};
 
     // Summary
     const summary    = data.summary || {};
+    const exec       = data.executive_summary || null;
+    const limits     = exec?.limits || {};
     // Collecter tous les CVEs : all_cves principal + fallback depuis all_results (cpe_cves + cve_details NSE)
     let allCves = data.cve_summary?.all_cves || [];
 
@@ -917,16 +1096,26 @@ function renderReport(data) {
             }
         });
     });
+    const cvssByCveId = new Map(
+        allCves.map(c => [c.cve_id, Number(c.cvss_v3_score || c.cvss_v2_score || 0)])
+    );
+
+    // Répartition basée sur toutes les CVE remontées par le scan (tous hôtes/ports)
+    const cveLookupById = new Map(allCves.map(c => [c.cve_id, c]));
+    const fromScan = severityStatsFromScanResults(allResults, cveLookupById);
+    cveBySev = fromScan.stats;
+    totalCves = fromScan.total;
 
     // ── 2. Hide drop zone, show report ───────────────────────────────────
     $('dropZone').classList.add('hidden');
     $('report').classList.add('visible');
+    resolveMascotImage();
 
     // ── 3. Topbar meta ────────────────────────────────────────────────────
     const ts = data.timestamp ? new Date(data.timestamp) : null;
     $('topMeta').innerHTML =
         (ts ? ts.toLocaleString('fr-FR') + ' &nbsp;|&nbsp; ' : '') +
-        `v${data.version || '4.0'} &nbsp;|&nbsp; ${(data.system_info?.os || '')} ${data.system_info?.os_version || ''}`;
+        `v1.0 &nbsp;|&nbsp; ${(data.system_info?.os || '')} ${data.system_info?.os_version || ''}`;
     $('footerRight').textContent = ts ? 'Rapport du ' + ts.toLocaleDateString('fr-FR') : '';
 
     // ── 4. Hero ───────────────────────────────────────────────────────────
@@ -962,12 +1151,100 @@ function renderReport(data) {
         $('bkExposure').textContent = '—';
         $('bkExposureDesc').textContent = `${summary.vulnerabilities_found || 0} services vulnérables`;
     }
+    if (bkCvssMax !== null) {
+        $('bkCvssMax').textContent = bkCvssMax;
+        $('bkCvssMaxDesc').textContent = `CVSS max ${worstCvss}`;
+    } else {
+        const inferredCvssBonus = Math.max(0, Math.min(10, Math.floor(Number(worstCvss || 0))));
+        $('bkCvssMax').textContent = inferredCvssBonus;
+        $('bkCvssMaxDesc').textContent = `CVSS max ${worstCvss || 0}`;
+    }
 
     // ── 6. Stats ──────────────────────────────────────────────────────────
     $('sHosts').textContent    = summary.total_hosts    ?? '—';
     $('sServices').textContent = summary.total_services ?? '—';
     $('sVulns').textContent    = summary.vulnerabilities_found ?? '—';
     $('sCves').textContent     = totalCves;
+
+    // 6-bis. Executive summary (compact view for large CIDR scans)
+    const execSection = $('execSummarySection');
+    if (exec && exec.totals) {
+        execSection.style.display = 'block';
+        const t = exec.totals;
+        // Runtime relabel to avoid mojibake from legacy template bytes
+        const execTitle = execSection.querySelector('p.sec-title');
+        if (execTitle) execTitle.textContent = 'Synthese Executive';
+        const tableTitles = execSection.querySelectorAll('.cve-table-header .sec-title');
+        if (tableTitles[1]) tableTitles[1].textContent = 'Top CVE Prioritaires';
+        if (tableTitles[2]) tableTitles[2].textContent = 'Top Hotes a traiter';
+        const cveHead = execSection.querySelectorAll('table thead tr')[0];
+        if (cveHead && cveHead.children.length >= 5) {
+            cveHead.children[2].textContent = 'Severite';
+            cveHead.children[3].textContent = 'Hotes impactes';
+            cveHead.children[4].textContent = 'Services';
+        }
+        $('execTotalsTitle').textContent = `Vue globale (${t.hosts_vulnerable || 0} hôte(s) vulnérable(s))`;
+        $('execTotalsBody').innerHTML =
+            `Hosts scannés: <strong>${t.hosts_scanned ?? 0}</strong> &nbsp;|&nbsp; ` +
+            `Hosts vulnérables: <strong>${t.hosts_vulnerable ?? 0}</strong> &nbsp;|&nbsp; ` +
+            `CVE uniques: <strong>${t.total_unique_cves ?? 0}</strong><br>` +
+            `CRITICAL: <strong>${t.critical ?? 0}</strong> &nbsp; ` +
+            `HIGH: <strong>${t.high ?? 0}</strong> &nbsp; ` +
+            `MEDIUM: <strong>${t.medium ?? 0}</strong> &nbsp; ` +
+            `LOW: <strong>${t.low ?? 0}</strong>`;
+
+        // Force clean ASCII labels to avoid mojibake display on generated files
+        $('execTotalsTitle').textContent = `Vue globale`;
+        $('execTotalsBody').innerHTML =
+            `Hosts scannes: <strong>${t.hosts_scanned ?? 0}</strong>`;
+
+        const cveBody = $('execTopCvesBody');
+        cveBody.innerHTML = '';
+        (exec.top_cves || [])
+            .filter(c => String(c.severity || '').toUpperCase() === 'CRITICAL')
+            .filter(c => {
+                const s = Number(c.cvss ?? 0);
+                if (s > 0) return true;
+                return !!(c.cve_id && cvssByCveId.has(c.cve_id) && Number(cvssByCveId.get(c.cve_id) || 0) > 0);
+            })
+            .slice(0, 10)
+            .forEach(c => {
+            const tr = document.createElement('tr');
+            const sevCol = SEV_COLORS[c.severity] || SEV_COLORS.UNKNOWN;
+            let cvssNum = Number(c.cvss ?? 0);
+            if (cvssNum <= 0 && c.cve_id && cvssByCveId.has(c.cve_id)) {
+                cvssNum = Number(cvssByCveId.get(c.cve_id) || 0);
+            }
+            const scoreDisplay = cvssNum > 0 ? cvssNum.toFixed(1) : 'N/A';
+            const cveLink = c.nvd_url
+                ? `<a href="${c.nvd_url}" target="_blank" rel="noopener noreferrer" class="cve-link">${c.cve_id}</a>`
+                : (c.cve_id || 'â€”');
+            tr.innerHTML = `
+                <td>${cveLink}</td>
+                <td><span class="score-pill" style="background:color-mix(in srgb,${sevCol} 18%,transparent);color:${sevCol}">${scoreDisplay}</span></td>
+                <td><span style="color:${sevCol};font-weight:700;">${c.severity || 'UNKNOWN'}</span></td>
+                <td>${c.host_count ?? 0}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--muted);">${(c.sample_services || []).join(', ') || '-'}</td>`;
+            tr.innerHTML = tr.innerHTML.replace(/â€”|Ã¢â‚¬â€|ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢/g, '-');
+            cveBody.appendChild(tr);
+        });
+
+        const hostBody = $('execTopHostsBody');
+        hostBody.innerHTML = '';
+        (exec.top_hosts || []).forEach(h => {
+            const tr = document.createElement('tr');
+            const hostOs = inferHostOs(h.ip, allResults);
+            tr.innerHTML = `
+                <td style="font-family:'DM Mono',monospace;">${h.ip || 'â€”'}</td>
+                <td>${hostOs}</td>
+                <td>${h.total_cves ?? 0}</td>
+                <td>${Number(h.worst_cvss ?? 0).toFixed(1)}</td>`;
+            tr.innerHTML = tr.innerHTML.replace(/â€”|Ã¢â‚¬â€|ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢/g, '-');
+            hostBody.appendChild(tr);
+        });
+    } else {
+        execSection.style.display = 'none';
+    }
 
     // ── 7. Severity bars ──────────────────────────────────────────────────
     const sevBarsEl = $('sevBars');
@@ -1003,7 +1280,15 @@ function renderReport(data) {
     if (!vulns.length) {
         vulnListEl.innerHTML = '<div class="empty"><span>✅</span>Aucune vulnérabilité courante détectée</div>';
     } else {
-        vulns.forEach(vuln => vulnListEl.appendChild(makeVulnCard(vuln)));
+        const maxVulnCards = Number(limits.max_vulnerability_cards || 60);
+        vulns.slice(0, maxVulnCards).forEach(vuln => vulnListEl.appendChild(makeVulnCard(vuln)));
+        if (vulns.length > maxVulnCards) {
+            const extra = document.createElement('div');
+            extra.className = 'empty';
+            extra.style.padding = '16px 12px';
+            extra.innerHTML = `Affichage limité à ${maxVulnCards} résultat(s) sur ${vulns.length}. Voir la synthèse exécutive pour la priorité.`;
+            vulnListEl.appendChild(extra);
+        }
     }
 
     // ── 9. CVE Table ──────────────────────────────────────────────────────
@@ -1014,7 +1299,8 @@ function renderReport(data) {
         const tbody = $('cveTableBody');
         tbody.innerHTML = '';
         const sorted = [...cves].sort((a,b) => (b.cvss_v3_score||b.cvss_v2_score||0) - (a.cvss_v3_score||a.cvss_v2_score||0));
-        sorted.slice(0,20).forEach(cve => tbody.appendChild(makeCveRow(cve)));
+        const maxCveRows = Number(limits.max_cve_rows || 20);
+        sorted.slice(0, maxCveRows).forEach(cve => tbody.appendChild(makeCveRow(cve)));
     }
 
     // ── 10. Scale grid ────────────────────────────────────────────────────
@@ -1038,9 +1324,23 @@ function renderReport(data) {
 function makeVulnCard(vuln) {
     const t    = vuln.test_result || {};
     const cves = t.cves || [];
-    const topCve  = cves[0] || null;
-    const topScore = topCve ? (topCve.cvss_v3_score || topCve.cvss_v2_score || 0) : 0;
-    const sev  = topCve ? ((topCve.severity || '').toUpperCase() || severityFromCvss(topScore)) : sevFromType(t.vulnerability_type);
+
+    // Always classify card by the worst CVE (not by list order)
+    let topCve = null;
+    let topScore = 0;
+    if (cves.length) {
+        cves.forEach(c => {
+            const s = Number(c.cvss_v3_score || c.cvss_v2_score || 0);
+            if (!topCve || s > topScore) {
+                topCve = c;
+                topScore = s;
+            }
+        });
+    }
+
+    const sev  = topCve
+        ? ((topCve.severity || '').toUpperCase() || severityFromCvss(topScore))
+        : sevFromType(t.vulnerability_type);
     const col  = SEV_COLORS[sev] || SEV_COLORS.UNKNOWN;
 
     const card = document.createElement('div');

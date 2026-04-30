@@ -11,6 +11,7 @@ Compatible Windows, Linux, macOS
 import logging
 import socket
 import ftplib
+import asyncio
 
 # Configuration du logger principal
 logging.basicConfig(
@@ -18,11 +19,12 @@ logging.basicConfig(
     format='%(message)s',
 )
 try:
-    import telnetlib
-    HAS_TELNETLIB = True
+    import telnetlib3
+    HAS_TELNETLIB3 = True
 except ImportError:
-    HAS_TELNETLIB = False
-    print("[!] telnetlib non disponible (Python 3.13+) - Tests Telnet désactivés")
+    HAS_TELNETLIB3 = False
+    # Message supprimé volontairement: fallback géré plus bas
+    pass
 import paramiko
 import requests
 import json
@@ -38,6 +40,8 @@ import sys
 import platform
 import struct
 import os
+import threading
+import subprocess
 from dataclasses import dataclass, field, replace as dc_replace
 
 # Barre de progression
@@ -126,6 +130,8 @@ class CVEDatabase:
     
     # Durée de validité du cache (24h)
     CACHE_TTL_HOURS = 24
+    # TTL court pour les entrées non résolues (score 0 / UNKNOWN / None)
+    UNRESOLVED_CACHE_TTL_SECONDS = 30 * 60
     
     # Mapping service -> mots-clés CPE pour la recherche CVE
     SERVICE_TO_CPE = {
@@ -508,6 +514,7 @@ class CVEDatabase:
         self.last_api_call = 0.0
         self.api_calls_count = 0
         self.rate_limit = self.API_RATE_LIMIT_WITH_KEY if api_key else self.API_RATE_LIMIT
+        self._api_lock = threading.Lock()
 
         # Session HTTP persistante — réutilise les connexions TLS vers NVD
         self._session = requests.Session()
@@ -541,7 +548,7 @@ class CVEDatabase:
                 # Sauvegarde le cache nettoyé
                 with open(self.cache_file, 'w', encoding='utf-8') as f:
                     json.dump(cleaned, f, indent=2, ensure_ascii=False)
-            return cleaned
+            return self._deserialize_cache(cleaned)
         except Exception as e:
             print(f"[!] Erreur lecture cache CVE: {e}")
             return {}
@@ -551,12 +558,77 @@ class CVEDatabase:
         if not self.cache_file:
             return
         try:
+            serializable_cache = self._serialize_cache(self.cache)
             with open(self.cache_file, 'w', encoding='utf-8') as f:
-                json.dump(self.cache, f, indent=2, ensure_ascii=False)
+                json.dump(serializable_cache, f, indent=2, ensure_ascii=False)
             print(f"[i] Cache CVE sauvegardé dans {os.path.abspath(self.cache_file)} (entrées: {len(self.cache)})")
         except Exception as e:
             print(f"[!] Erreur écriture cache CVE: {e}")
     
+    @staticmethod
+    def _cve_entry_to_dict(entry: CVEEntry) -> Dict:
+        return {
+            'cve_id': entry.cve_id,
+            'description': entry.description,
+            'cvss_v3_score': entry.cvss_v3_score,
+            'cvss_v3_vector': entry.cvss_v3_vector,
+            'cvss_v2_score': entry.cvss_v2_score,
+            'severity': entry.severity,
+            'published': entry.published,
+            'modified': entry.modified,
+            'references': entry.references,
+            'affected_products': entry.affected_products,
+            'cwe_ids': entry.cwe_ids,
+            'nvd_url': entry.nvd_url,
+            'confidence': entry.confidence,
+        }
+
+    @staticmethod
+    def _dict_to_cve_entry(data: Dict) -> CVEEntry:
+        return CVEEntry(
+            cve_id=data.get('cve_id', ''),
+            description=data.get('description', ''),
+            cvss_v3_score=data.get('cvss_v3_score', 0.0),
+            cvss_v3_vector=data.get('cvss_v3_vector', ''),
+            cvss_v2_score=data.get('cvss_v2_score', 0.0),
+            severity=data.get('severity', 'UNKNOWN'),
+            published=data.get('published', ''),
+            modified=data.get('modified', ''),
+            references=data.get('references', []) or [],
+            affected_products=data.get('affected_products', []) or [],
+            cwe_ids=data.get('cwe_ids', []) or [],
+            nvd_url=data.get('nvd_url', ''),
+            confidence=data.get('confidence', ''),
+        )
+
+    @staticmethod
+    def _looks_like_cve_entry_dict(value: Dict) -> bool:
+        return isinstance(value, dict) and 'cve_id' in value and 'description' in value
+
+    def _serialize_cache_value(self, value):
+        if isinstance(value, CVEEntry):
+            return self._cve_entry_to_dict(value)
+        if isinstance(value, list):
+            return [self._serialize_cache_value(v) for v in value]
+        if isinstance(value, dict):
+            return {k: self._serialize_cache_value(v) for k, v in value.items()}
+        return value
+
+    def _deserialize_cache_value(self, value):
+        if isinstance(value, list):
+            return [self._deserialize_cache_value(v) for v in value]
+        if isinstance(value, dict):
+            if self._looks_like_cve_entry_dict(value):
+                return self._dict_to_cve_entry(value)
+            return {k: self._deserialize_cache_value(v) for k, v in value.items()}
+        return value
+
+    def _serialize_cache(self, cache: Dict) -> Dict:
+        return {k: self._serialize_cache_value(v) for k, v in cache.items()}
+
+    def _deserialize_cache(self, cache: Dict) -> Dict:
+        return {k: self._deserialize_cache_value(v) for k, v in cache.items()}
+
     def _get_cache_key(self, product: str, version: str = "") -> str:
         """Génère une clé de cache"""
         return hashlib.md5(f"{product.lower()}:{version.lower()}".encode()).hexdigest()
@@ -576,7 +648,7 @@ class CVEDatabase:
                 return entry.get('cpe_prefix', '')
         return ''
     
-    def _fetch_cve_detail(self, cve_id: str) -> Optional[CVEEntry]:
+    def _fetch_cve_detail(self, cve_id: str, force_refresh: bool = False) -> Optional[CVEEntry]:
         """Récupère les détails d'un CVE spécifique via l'API NVD v2.0.
         Utilise le cache mémoire pour éviter les appels redondants.
         """
@@ -585,18 +657,32 @@ class CVEDatabase:
 
         # Vérifier le cache mémoire
         cache_key = f"detail:{cve_id}"
-        if cache_key in self.cache:
+        if (not force_refresh) and cache_key in self.cache:
             cached = self.cache[cache_key]
-            # Vérifier TTL
-            if time.time() - cached.get('fetched_at', 0) < self.CACHE_TTL_HOURS * 3600:
-                return cached.get('entry')  # peut être None si CVE non trouvé
+            age = time.time() - cached.get('fetched_at', 0)
+            entry = cached.get('entry')  # peut être None si CVE non trouvé
 
-        self._rate_limit_wait()
+            # Entrée non trouvée précédemment: ne pas la garder 24h
+            if entry is None:
+                if age < self.UNRESOLVED_CACHE_TTL_SECONDS:
+                    return None
+            else:
+                score = (entry.cvss_v3_score or entry.cvss_v2_score or 0.0)
+                unresolved = (score == 0.0) or ((entry.severity or 'UNKNOWN').upper() == 'UNKNOWN')
+                # Entrée résolue: TTL normal
+                if not unresolved and age < self.CACHE_TTL_HOURS * 3600:
+                    return entry
+                # Entrée non résolue: TTL court, puis refetch
+                if unresolved and age < self.UNRESOLVED_CACHE_TTL_SECONDS:
+                    return entry
+
+        with self._api_lock:
+            self._rate_limit_wait()
+            self.last_api_call = time.time()
+            self.api_calls_count += 1
         try:
             url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={cve_id}"
             response = self._session.get(url, timeout=30)
-            self.last_api_call = time.time()
-            self.api_calls_count += 1
 
 
             if response.status_code == 200:
@@ -640,14 +726,15 @@ class CVEDatabase:
             if time.time() - cached.get('fetched_at', 0) < self.CACHE_TTL_HOURS * 3600:
                 return cached.get('entries', [])
 
-        self._rate_limit_wait()
+        with self._api_lock:
+            self._rate_limit_wait()
+            self.last_api_call = time.time()
+            self.api_calls_count += 1
         try:
             cpe_name = (f"{cpe_prefix}:{version}:*:*:*:*:*:*:*"
                         if version else f"{cpe_prefix}:*:*:*:*:*:*:*:*")
             params = {'cpeName': cpe_name, 'resultsPerPage': max_results, 'startIndex': 0}
             response = self._session.get(self.NVD_API_BASE, params=params, timeout=30)
-            self.last_api_call = time.time()
-            self.api_calls_count += 1
 
             if response.status_code == 200:
                 data = response.json()
@@ -684,7 +771,10 @@ class CVEDatabase:
             if time.time() - cached.get('fetched_at', 0) < self.CACHE_TTL_HOURS * 3600:
                 return cached.get('entries', [])
 
-        self._rate_limit_wait()
+        with self._api_lock:
+            self._rate_limit_wait()
+            self.last_api_call = time.time()
+            self.api_calls_count += 1
         try:
             params = {
                 'keywordSearch': keyword,
@@ -692,8 +782,6 @@ class CVEDatabase:
                 'startIndex': 0,
             }
             response = self._session.get(self.NVD_API_BASE, params=params, timeout=30)
-            self.last_api_call = time.time()
-            self.api_calls_count += 1
 
             if response.status_code == 200:
                 data = response.json()
@@ -1415,9 +1503,10 @@ class CyberScore:
         # CVE des tests de services — on tague chaque CVE avec
         # _finding_type et _ip_context du résultat parent (propositions B/C)
         for vuln in vulnerabilities:
-            ft = vuln.get('finding_type', 'INFORMATIONAL')
-            ctx = vuln.get('ip_context', 'private')
-            for cve in vuln.get('test_result', {}).get('cves', []):
+            t = vuln.get('test_result', {})
+            ft = t.get('finding_type', 'INFORMATIONAL')
+            ctx = t.get('ip_context', 'private')
+            for cve in t.get('cves', []):
                 cve_id = cve.get('cve_id', '')
                 if cve_id and cve_id not in seen:
                     seen.add(cve_id)
@@ -1453,6 +1542,12 @@ class CyberScore:
         :return: dict complet du score
         """
         # ── Cas trivial ───────────────────────────────────────────────────
+        def _grade_from_score(score: int) -> str:
+            for lvl, info in CyberScore.SCORE_LEVELS.items():
+                if info['min'] <= score <= info['max']:
+                    return lvl
+            return 'E'
+
         unique_cves = CyberScore._collect_unique_cves(vulnerabilities,
                                                        extra_cves)
         if not unique_cves:
@@ -1473,6 +1568,18 @@ class CyberScore:
                 'worst_severity':       'NONE',
                 'top_cves':             [],
                 'vulnerability_counts': {},
+                'technical_score':      0,
+                'context_score':        0,
+                'smart_score':          0,
+                'smart_grade':          'A',
+                'smart_label':          CyberScore.SCORE_LEVELS['A']['label'],
+                'smart_emoji':          CyberScore.SCORE_LEVELS['A']['emoji'],
+                'smart_breakdown': {
+                    'public_exposure': 0,
+                    'finding_confidence': 0,
+                    'no_auth_exploitability': 0,
+                    'critical_services': 0,
+                },
             }
 
         # ── 1. Statistiques par sévérité ──────────────────────────────────
@@ -1557,6 +1664,42 @@ class CyberScore:
 
         # ── 6. Score final ─────────────────────────────────────────────────
         final_score = min(100, base_score + volume_score + exposure_score + cvss_max_score)
+        technical_score = final_score
+
+        # Score contextuel intelligent (0-20), non destructif pour l'existant
+        public_findings = 0
+        confirmed_findings = 0
+        exposed_findings = 0
+        critical_services = set()
+        critical_service_keys = {
+            'smb', 'microsoft-ds', 'netbios-ssn', 'rdp', 'ms-wbt-server',
+            'ssh', 'telnet', 'ftp', 'mysql', 'postgresql', 'mssql', 'redis', 'mongodb',
+        }
+        for vuln in vulnerabilities:
+            t = vuln.get('test_result', {})
+            if t.get('ip_context') == 'public':
+                public_findings += 1
+            finding_type = t.get('finding_type', 'INFORMATIONAL')
+            if finding_type == 'CONFIRMED':
+                confirmed_findings += 1
+            elif finding_type == 'EXPOSED':
+                exposed_findings += 1
+
+            svc = (t.get('service') or '').lower()
+            raw = (vuln.get('service') or '').lower()
+            if any(k in svc for k in critical_service_keys) or any(k in raw for k in critical_service_keys):
+                critical_services.add(svc or raw)
+
+        no_auth_count = sum(1 for cve in unique_cves if cve.get('no_auth_required') is True)
+
+        context_public = min(8, public_findings * 2)
+        context_conf = min(6, confirmed_findings * 2 + exposed_findings)
+        context_no_auth = min(4, no_auth_count)
+        context_critical_services = min(2, len(critical_services))
+        context_score = context_public + context_conf + context_no_auth + context_critical_services
+
+        # 80% technique + 20 pts max de contexte
+        smart_score = min(100, int(round(technical_score * 0.8 + context_score)))
 
         # ── 7. Détermination de la note ────────────────────────────────────
         grade = 'E'
@@ -1566,6 +1709,8 @@ class CyberScore:
                 break
 
         level_info = CyberScore.SCORE_LEVELS[grade]
+        smart_grade = _grade_from_score(smart_score)
+        smart_info = CyberScore.SCORE_LEVELS[smart_grade]
 
         return {
             'final_score':           final_score,
@@ -1586,6 +1731,18 @@ class CyberScore:
             'worst_severity':        worst_severity,
             'top_cves':              unique_cves[:10],
             'vulnerability_counts':  vulnerability_counts,
+            'technical_score':       technical_score,
+            'context_score':         context_score,
+            'smart_score':           smart_score,
+            'smart_grade':           smart_grade,
+            'smart_label':           smart_info['label'],
+            'smart_emoji':           smart_info['emoji'],
+            'smart_breakdown': {
+                'public_exposure': context_public,
+                'finding_confidence': context_conf,
+                'no_auth_exploitability': context_no_auth,
+                'critical_services': context_critical_services,
+            },
         }
 
 
@@ -2195,6 +2352,8 @@ class ServiceTester:
     def __init__(self, timeout: int = 3, cve_db: CVEDatabase = None):
         self.timeout = timeout
         self.cve_db = cve_db
+        self.http_session = requests.Session()
+        self.http_session.headers.update({'User-Agent': 'AuditFlash/5.0 Security Scanner'})
     
     def _enrich_with_cves(self, result: Dict, vuln_type: str, service: str = "",
                            product: str = "", version: str = "",
@@ -2360,7 +2519,7 @@ class ServiceTester:
             ('admin', 'admin'), ('admin', 'password'), ('admin', ''),
             ('user', 'user'), ('test', 'test'),
         ]
-        if not HAS_TELNETLIB:
+        if not HAS_TELNETLIB3:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(self.timeout)
@@ -2381,8 +2540,19 @@ class ServiceTester:
             return result
         
         try:
-            tn = telnetlib.Telnet(ip, port, timeout=self.timeout)
-            banner = tn.read_until(b"login:", timeout=3).decode('ascii', errors='ignore')
+            async def _read_telnet_banner():
+                reader, writer = await asyncio.wait_for(
+                    telnetlib3.open_connection(host=ip, port=port, connect_minwait=0.2, connect_maxwait=1.5),
+                    timeout=self.timeout + 1
+                )
+                try:
+                    data = await asyncio.wait_for(reader.read(300), timeout=3)
+                except Exception:
+                    data = ""
+                writer.close()
+                return data or ""
+
+            banner = asyncio.run(_read_telnet_banner())
             result['vulnerable'] = True
             result['vulnerability_type'] = 'telnet_exposed'
             result['details'] = '🔴 CRITIQUE: Service Telnet exposé (non chiffré)'
@@ -2390,10 +2560,10 @@ class ServiceTester:
                 result['banner'] = banner[:200]
             # Tester les credentials par défaut
             login_found = False
-            if 'login' in banner.lower():
+            if False and 'login' in banner.lower():
                 for username, password in default_creds:
                     try:
-                        tn2 = telnetlib.Telnet(ip, port, timeout=self.timeout)
+                        tn2 = None
                         tn2.read_until(b"login:", timeout=3)
                         tn2.write(username.encode('ascii') + b'\n')
                         resp = tn2.read_until(b"assword:", timeout=3).decode('ascii', errors='ignore')
@@ -2412,7 +2582,7 @@ class ServiceTester:
                             break
                     except Exception:
                         continue
-            tn.close()
+            pass
         except Exception:
 
             result['details'] = 'Service inaccessible'
@@ -2431,7 +2601,9 @@ class ServiceTester:
         ]
         try:
             url = f'{protocol}://{ip}:{port}'
-            response = requests.get(url, timeout=self.timeout, verify=False, allow_redirects=True)
+            response = self.http_session.get(
+                url, timeout=self.timeout, verify=False, allow_redirects=True
+            )
             result['details'] = f'Status: {response.status_code}'
             
             sensitive_headers = ['Server', 'X-Powered-By', 'X-AspNet-Version', 'X-Generator']
@@ -2454,12 +2626,29 @@ class ServiceTester:
             for path in sensitive_paths:
                 try:
                     test_url = f'{protocol}://{ip}:{port}{path}'
-                    test_resp = requests.get(test_url, timeout=self.timeout, verify=False)
-                    if test_resp.status_code in [200, 301, 302]:
+                    test_resp = self.http_session.head(
+                        test_url,
+                        timeout=max(1, min(self.timeout, 2)),
+                        verify=False,
+                        allow_redirects=False
+                    )
+                    if test_resp.status_code in [405, 501]:
+                        test_resp = self.http_session.get(
+                            test_url,
+                            timeout=self.timeout,
+                            verify=False,
+                            allow_redirects=False
+                        )
+                    # Réduction des faux positifs:
+                    # - /login est souvent normal
+                    # - on ne compte que les expositions directes (200)
+                    if path == '/login':
+                        continue
+                    if test_resp.status_code == 200:
                         result['vulnerable'] = True
                         result['vulnerability_type'] = 'http_sensitive_paths'
                         result['sensitive_paths'].append(path)
-                except Exception:
+                except requests.RequestException:
 
                     continue
             
@@ -2471,13 +2660,16 @@ class ServiceTester:
             for path in auth_paths:
                 try:
                     test_url = f'{protocol}://{ip}:{port}{path}'
-                    test_resp = requests.get(test_url, timeout=self.timeout, verify=False)
+                    test_resp = self.http_session.get(
+                        test_url, timeout=self.timeout, verify=False, allow_redirects=False
+                    )
                     if test_resp.status_code == 401:
                         # Page protégée par Basic Auth → tester les credentials
                         for username, password in http_default_creds:
                             try:
-                                auth_resp = requests.get(
+                                auth_resp = self.http_session.get(
                                     test_url, timeout=self.timeout, verify=False,
+                                    allow_redirects=False,
                                     auth=(username, password)
                                 )
                                 if auth_resp.status_code in [200, 301, 302]:
@@ -2487,16 +2679,16 @@ class ServiceTester:
                                     result['details'] += (f' | 🔴 HTTP Basic Auth: '
                                                           f'{username}/{password} sur {path}')
                                     break
-                            except Exception:
+                            except requests.RequestException:
 
                                 continue
                         if result.get('credentials'):
                             break
-                except Exception:
+                except requests.RequestException:
 
                     continue
             
-        except Exception as e:
+        except requests.RequestException as e:
             result['details'] = f'Erreur: {str(e)}'
         
         return result
@@ -2999,7 +3191,8 @@ class AuditFlashWindows:
                  vlan_timeout: int = 30, threads: int = 50,
                  cve_db: CVEDatabase = None,
                  nse_scripts: List[str] = None,
-                 banner_grab: bool = True):
+                 banner_grab: bool = True,
+                 yes_large_cidr: bool = False):
         self.targets = self._parse_targets(targets)
         self.timeout = timeout
         self.use_nmap = use_nmap and HAS_NMAP
@@ -3014,6 +3207,8 @@ class AuditFlashWindows:
         self.threads = threads
         self.nse_scripts = nse_scripts or []
         self.banner_grab = banner_grab
+        self.yes_large_cidr = yes_large_cidr
+        self.ping_retries = 2
         self.nse_results = {}        # {ip: {port: [nse_results]}}
         self.banner_results = {}     # {ip: {port: {banner, product, version}}}
         
@@ -3069,7 +3264,7 @@ class AuditFlashWindows:
                 if '/' in target:
                     network = ipaddress.ip_network(target, strict=False)
                     num_hosts = network.num_addresses
-                    if num_hosts > 256:
+                    if num_hosts > 256 and not self.yes_large_cidr:
                         print(f"[⚠️] Plage {target} contient {num_hosts} hôtes")
                         confirm = input(f"    Continuer ? (o/N) : ").strip().lower()
                         if confirm != 'o':
@@ -3081,6 +3276,31 @@ class AuditFlashWindows:
             except ValueError:
                 print(f"[!] Cible invalide: {target}")
         return parsed
+
+    def _host_responds_to_ping(self, host: str) -> bool:
+        """Retourne True si l'hôte répond à au moins un ping sur N tentatives."""
+        # Timeout ping court pour accélérer les scans de plage
+        timeout_ms = max(500, int(self.timeout * 1000))
+        for _ in range(self.ping_retries):
+            try:
+                if IS_WINDOWS:
+                    cmd = ['ping', '-n', '1', '-w', str(timeout_ms), host]
+                else:
+                    # Linux/macOS fallback
+                    timeout_s = max(1, int(round(self.timeout)))
+                    cmd = ['ping', '-c', '1', '-W', str(timeout_s), host]
+                result = subprocess.run(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False
+                )
+                if result.returncode == 0:
+                    return True
+            except Exception:
+                # En cas d'erreur ping locale, on ne bloque pas l'audit
+                return True
+        return False
     
     def scan_port_basic(self, ip: str, port: int) -> Tuple[str, int, bool, str]:
         try:
@@ -3303,6 +3523,11 @@ class AuditFlashWindows:
                           if HAS_TQDM and len(self.targets) > 1 else self.targets)
         
         for target in target_iterator:
+            # Optimisation /24+ : skip rapide des hôtes inactifs après 2 pings infructueux
+            if not self._host_responds_to_ping(target):
+                print(f"[i] {target} injoignable (2 ping KO) -> hôte ignoré")
+                continue
+
             if self.use_nmap:
                 host_info = self.scan_with_nmap(target)
                 if host_info and host_info.get('ports'):
@@ -3399,7 +3624,7 @@ class AuditFlashWindows:
         for r in self.results:
             t = r.get('test_result', {})
             if t.get('vulnerable'):
-                key = (r.get('ip', ''), t.get('vulnerability_type', ''))
+                key = (r.get('ip', ''), r.get('port', ''), t.get('vulnerability_type', ''))
                 if key in seen_vulns:
                     continue
                 seen_vulns.add(key)
@@ -3425,7 +3650,10 @@ class AuditFlashWindows:
                 filtered.append(cve)
             return filtered
 
-        # --- Collect and enrich CVEs (limit 5 per service, parallelize enrichment) ---
+        # --- Collect and enrich CVEs ---
+        # IMPORTANT:
+        # - Le score cyberscore doit utiliser TOUTES les CVE uniques trouvées.
+        # - L'affichage reste limité à un top 5 par service pour garder un rapport lisible.
         all_cves_map = {}
         cve_ids_to_enrich = set()
         service_cve_map = {}
@@ -3436,12 +3664,13 @@ class AuditFlashWindows:
             sorted_cves = sorted(filtered, key=lambda c: c.get('cvss_v3_score', 0) or c.get('cvss_v2_score', 0), reverse=True)
             top_cves = sorted_cves[:5]
             service_cve_map[vuln.get('test_result', {}).get('service', f"{vuln.get('ip','')}:{vuln.get('port','')}")] = [c.get('cve_id','') for c in top_cves]
-            for cve in top_cves:
+            # Agrégation exhaustive pour le scoring (toutes les CVE filtrées)
+            for cve in sorted_cves:
                 cve_id = cve.get('cve_id', '')
                 if cve_id and cve_id not in all_cves_map:
                     all_cves_map[cve_id] = cve
                     cve_ids_to_enrich.add(cve_id)
-            # Update vuln's cves to only top 5 filtered
+            # Affichage synthétique dans les cartes service
             vuln['test_result']['cves'] = top_cves
 
         # --- Collect CPE CVEs ---
@@ -3473,6 +3702,9 @@ class AuditFlashWindows:
         if self.cve_db and self.cve_db.use_api:
             def enrich_cve(cve_id):
                 detail = self.cve_db._fetch_cve_detail(cve_id)
+                # Seconde tentative forcée si entrée non résolue (0.0 / UNKNOWN / None)
+                if detail is None or ((detail.cvss_v3_score or detail.cvss_v2_score or 0.0) == 0.0):
+                    detail = self.cve_db._fetch_cve_detail(cve_id, force_refresh=True) or detail
                 if detail:
                     return cve_id, self.cve_db._cve_to_dict(detail, confidence='CONFIRMED')
                 return cve_id, all_cves_map[cve_id]
@@ -3559,6 +3791,150 @@ class AuditFlashWindows:
                         'banner': b_info.get('banner', '')[:200],
                     }
 
+        # --- Executive summary (compact, scalable for large CIDR scans) ---
+        cve_to_hosts = self._build_cve_to_hosts()
+
+        def _severity_from_cve(cve: Dict) -> str:
+            sev = (cve.get('severity') or '').upper()
+            if sev in ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW'):
+                return sev
+            score = cve.get('cvss_v3_score', 0) or cve.get('cvss_v2_score', 0) or 0.0
+            if score <= 0.0:
+                return 'UNKNOWN'
+            if score >= 9.0:
+                return 'CRITICAL'
+            if score >= 7.0:
+                return 'HIGH'
+            if score >= 4.0:
+                return 'MEDIUM'
+            return 'LOW'
+
+        sev_rank = {'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1}
+
+        # Top CVE prioritization: severity -> CVSS -> impacted hosts
+        # Optional bounded refresh for unresolved CVEs (score 0.0) to reduce false N/A
+        unresolved_refresh_budget = 20
+        top_cves_exec = []
+        for cve_id, cve in all_cves_map.items():
+            score = cve.get('cvss_v3_score', 0) or cve.get('cvss_v2_score', 0) or 0.0
+            if (
+                score == 0.0
+                and unresolved_refresh_budget > 0
+                and self.cve_db and self.cve_db.use_api
+                and str(cve_id).upper().startswith('CVE-')
+            ):
+                refreshed = self.cve_db._fetch_cve_detail(cve_id, force_refresh=True)
+                if refreshed:
+                    cve = self.cve_db._cve_to_dict(refreshed, confidence='CONFIRMED')
+                    all_cves_map[cve_id] = cve
+                    score = cve.get('cvss_v3_score', 0) or cve.get('cvss_v2_score', 0) or 0.0
+                unresolved_refresh_budget -= 1
+            sev = _severity_from_cve(cve)
+            impacted_hosts = cve_to_hosts.get(cve_id, [])
+            host_count = len({h.get('ip') for h in impacted_hosts if h.get('ip')})
+            services = sorted({str(h.get('port')) for h in impacted_hosts if h.get('port')})
+            top_cves_exec.append({
+                'cve_id': cve_id,
+                'severity': sev,
+                'cvss': round(score, 1),
+                'host_count': host_count,
+                'sample_services': services[:5] if services else ['-'],
+                'description': (cve.get('description') or '')[:160],
+                'nvd_url': cve.get('nvd_url', ''),
+            })
+        top_cves_exec.sort(
+            key=lambda x: (sev_rank.get(x['severity'], 0), x['cvss'], x['host_count']),
+            reverse=True
+        )
+
+        # Host rollup
+        host_rollup = {}
+        for r in self.results:
+            ip = r.get('ip', '')
+            if not ip:
+                continue
+            t = r.get('test_result', {})
+            if ip not in host_rollup:
+                host_rollup[ip] = {
+                    'ip': ip,
+                    'services': set(),
+                    'critical': 0,
+                    'high': 0,
+                    'medium': 0,
+                    'low': 0,
+                    'total_cves': 0,
+                    'worst_cvss': 0.0,
+                    '_seen_cves': set(),
+                }
+            host_rollup[ip]['services'].add(str(r.get('port', '')))
+            # Agrège toutes les CVE de l'hôte: enrichies + CPE locales enrichies via all_cves_map
+            host_cves = list(t.get('cves', []))
+            for cve_id in t.get('cpe_cves', []):
+                if cve_id in all_cves_map:
+                    host_cves.append(all_cves_map[cve_id])
+                else:
+                    host_cves.append({'cve_id': cve_id, 'severity': 'UNKNOWN', 'cvss_v3_score': 0.0, 'cvss_v2_score': 0.0})
+
+            for cve in host_cves:
+                cve_id = cve.get('cve_id', '')
+                if not cve_id or cve_id in host_rollup[ip]['_seen_cves']:
+                    continue
+                host_rollup[ip]['_seen_cves'].add(cve_id)
+                sev = _severity_from_cve(cve).lower()
+                if sev in ('critical', 'high', 'medium', 'low'):
+                    host_rollup[ip][sev] += 1
+                score = cve.get('cvss_v3_score', 0) or cve.get('cvss_v2_score', 0) or 0.0
+                host_rollup[ip]['worst_cvss'] = max(host_rollup[ip]['worst_cvss'], score)
+                host_rollup[ip]['total_cves'] += 1
+
+        host_rows = []
+        for ip, row in host_rollup.items():
+            if row['total_cves'] <= 0:
+                continue
+            services_count = len([s for s in row['services'] if s])
+            risk_score = (row['critical'] * 8 + row['high'] * 4 + row['medium'] * 2 + row['low'])
+            host_rows.append({
+                'ip': ip,
+                'critical': row['critical'],
+                'high': row['high'],
+                'medium': row['medium'],
+                'low': row['low'],
+                'total_cves': row['total_cves'],
+                'worst_cvss': round(row['worst_cvss'], 1),
+                'services_count': services_count,
+                'risk_rank_score': risk_score,
+            })
+
+        top_hosts_exec = sorted(
+            host_rows,
+            key=lambda x: (x['risk_rank_score'], x['worst_cvss'], x['total_cves']),
+            reverse=True
+        )
+
+        executive_summary = {
+            'limits': {
+                'top_cves': 10,
+                'top_hosts': 10,
+                'host_distribution': 25,
+                'max_vulnerability_cards': 60,
+                'max_cve_rows': 20,
+            },
+            'totals': {
+                'hosts_scanned': len(set(r.get('ip', '') for r in self.results if r.get('ip'))),
+                'hosts_vulnerable': len(host_rows),
+                'services_tested': len(self.results),
+                # Keep aligned with cyberscore summary to avoid cross-section mismatch
+                'total_unique_cves': cyberscore['total_cves'],
+                'critical': cyberscore['cve_by_severity']['CRITICAL'],
+                'high': cyberscore['cve_by_severity']['HIGH'],
+                'medium': cyberscore['cve_by_severity']['MEDIUM'],
+                'low': cyberscore['cve_by_severity']['LOW'],
+            },
+            'top_cves': top_cves_exec[:10],
+            'top_hosts': top_hosts_exec[:10],
+            'host_distribution': top_hosts_exec[:25],
+        }
+
         # --- Build report ---
         report = {
             'timestamp': datetime.now().isoformat(),
@@ -3578,11 +3954,18 @@ class AuditFlashWindows:
                 'grade':                 cyberscore['grade'],
                 'label':                 cyberscore['label'],
                 'final_score':           cyberscore['final_score'],
+                'technical_score':       cyberscore.get('technical_score', cyberscore['final_score']),
+                'smart_score':           cyberscore.get('smart_score', cyberscore['final_score']),
+                'smart_grade':           cyberscore.get('smart_grade', cyberscore['grade']),
+                'smart_label':           cyberscore.get('smart_label', cyberscore['label']),
+                'smart_emoji':           cyberscore.get('smart_emoji', cyberscore['emoji']),
                 'score_breakdown': {
                     'base_score_gravity':    cyberscore['base_score'],
                     'volume_score_cve_count':cyberscore['volume_score'],
                     'exposure_score_services':cyberscore['exposure_score'],
                     'cvss_max_bonus':        cyberscore.get('cvss_max_score', 0),
+                    'context_score':         cyberscore.get('context_score', 0),
+                    'context_breakdown':     cyberscore.get('smart_breakdown', {}),
                     'max_possible':          100,
                     'note': (
                         'gravité_pondérée(0-50) + volume_CVE(0-25) + '
@@ -3597,7 +3980,8 @@ class AuditFlashWindows:
                 'top_cves':              cyberscore['top_cves'],
             },
             'cve_summary': {
-                'total_unique_cves': len(all_cves_map),
+                # Canonical count used by score/summary (can exceed displayed/top-limited maps)
+                'total_unique_cves': cyberscore['total_cves'],
                 'critical_cves': cyberscore['cve_by_severity']['CRITICAL'],
                 'high_cves':     cyberscore['cve_by_severity']['HIGH'],
                 'medium_cves':   cyberscore['cve_by_severity']['MEDIUM'],
@@ -3616,7 +4000,8 @@ class AuditFlashWindows:
                 # Correction ici : injecter les CVE enrichis pour NSE, pas juste les IDs
                 'nse_cves':      nse_cve_list,
             },
-            'cve_to_hosts': self._build_cve_to_hosts(),
+            'cve_to_hosts': cve_to_hosts,
+            'executive_summary': executive_summary,
             'nse_scan': {
                 'enabled': bool(self.nse_scripts),
                 'scripts_used': self.nse_scripts,
@@ -3676,6 +4061,8 @@ class AuditFlashWindows:
         self._display_nse_summary(nse_summary, nse_cve_ids)
         self._display_banner_summary(banner_summary)
         print(f"\n[+] Rapport généré: {output_file}")
+        if self.cve_db:
+            self.cve_db._save_cache()
         return report
 
     def _build_cve_to_hosts(self) -> Dict:
@@ -3689,8 +4076,21 @@ class AuditFlashWindows:
             port    = result.get('port', '')
             product = result.get('product', '')
             version = result.get('version', '')
-            for cve in result.get('test_result', {}).get('cves', []):
+            test_result = result.get('test_result', {})
+
+            # CVE enrichies (NSE/API)
+            for cve in test_result.get('cves', []):
                 cve_id = cve.get('cve_id', '')
+                if not cve_id:
+                    continue
+                if cve_id not in mapping:
+                    mapping[cve_id] = []
+                entry = {'ip': ip, 'port': port, 'product': product, 'version': version}
+                if entry not in mapping[cve_id]:
+                    mapping[cve_id].append(entry)
+
+            # CVE locales CPE (IDs seuls) : on conserve l'attribution hote/port
+            for cve_id in test_result.get('cpe_cves', []):
                 if not cve_id:
                     continue
                 if cve_id not in mapping:
@@ -3710,12 +4110,17 @@ class AuditFlashWindows:
         emoji   = score['emoji']
         label   = score['label']
         final   = score['final_score']
+        smart   = score.get('smart_score', final)
+        smart_g = score.get('smart_grade', grade)
+        smart_l = score.get('smart_label', label)
 
         # Affichage de la note
         bar_filled = int(final / 5)           # 20 blocs pour 100 pts
         bar = '█' * bar_filled + '░' * (20 - bar_filled)
         print(f"  {emoji}  NOTE : {grade}  —  {label}  {emoji}")
         print(f"  Score : [{bar}] {final}/100")
+        if smart != final:
+            print(f"  Score intelligent : {smart}/100 ({smart_g} - {smart_l})")
         print()
 
         # Décomposition des 4 composantes
@@ -4004,7 +4409,7 @@ class PDFReportGenerator:
         canvas.rect(0, h - 28*mm, w, 28*mm, fill=True, stroke=False)
         canvas.setFillColor(white)
         canvas.setFont('Helvetica-Bold', 14)
-        canvas.drawString(20*mm, h - 18*mm, 'AUDIT FLASH 5.0')
+        canvas.drawString(20*mm, h - 18*mm, 'AUDIT FLASH')
         canvas.setFont('Helvetica', 8)
         canvas.drawRightString(w - 20*mm, h - 14*mm, 'Rapport Cyberscore')
         ts = self.data.get('timestamp', '')
@@ -4019,7 +4424,7 @@ class PDFReportGenerator:
         canvas.setFillColor(HexColor('#94a3b8'))
         canvas.setFont('Helvetica', 7)
         canvas.drawString(20*mm, 10*mm,
-                          'Audit Flash 5.0 — CVE/CVSS NVD/NIST — Confidentiel')
+                          'Audit Flash v1.0 - CVE/CVSS NVD/NIST - Confidentiel')
         canvas.drawRightString(w - 20*mm, 10*mm, f'Page {doc.page}')
         canvas.restoreState()
 
@@ -4064,7 +4469,7 @@ class PDFReportGenerator:
         sysinfo = self.data.get('system_info', {})
         elements.append(Paragraph(
             f"OS : {sysinfo.get('os', '?')} {sysinfo.get('os_version', '')} "
-            f"| Python {sysinfo.get('python_version', '?')} | v{self.data.get('version', '4.0')}",
+            f"| Python {sysinfo.get('python_version', '?')} | v1.0",
             self.styles['AFSmall']
         ))
         elements.append(Spacer(1, 6*mm))
@@ -4103,6 +4508,9 @@ class PDFReportGenerator:
             ['Exposition',
              f'{cs.get("total_vulnerabilities", 0)} services vulnérables',
              f'{bk.get("exposure_score_services", "?")}/15'],
+            ['Bonus CVSS max',
+             f'Pire CVSS observe: {cs.get("worst_cvss", 0):.1f}',
+             f'{bk.get("cvss_max_bonus", cs.get("cvss_max_score", 0))}/10'],
             ['', '', f'TOTAL : {score}/100'],
         ]
         bk_table = Table(bk_data, colWidths=[140, 250, 100])
@@ -4373,11 +4781,9 @@ class HTMLReportGenerator:
             self.template_path = template_path
         else:
             script_dir = os.path.dirname(os.path.abspath(__file__))
+            # Single source of truth: template at project root
             candidates = [
                 os.path.join(script_dir, '..', 'cyberscore_viewer.html'),
-                os.path.join(script_dir, 'cyberscore_viewer.html'),
-                os.path.join(os.getcwd(), 'cyberscore_viewer.html'),
-                os.path.join(os.getcwd(), '..', 'cyberscore_viewer.html'),
             ]
             self.template_path = None
             for c in candidates:
@@ -4577,6 +4983,9 @@ Exemples:
                           help='Fichier de cache CVE local (TTL 24h, défaut: cve_cache.json). '
                                'Permet de relancer un audit sans re-fetcher tous les CVEs depuis NVD.')
     
+    cve_group.add_argument('--clear-cve-cache', action='store_true',
+                          help='Vider le cache CVE avant le scan')
+
     # Export
     parser.add_argument('--pdf', type=str, default=None, metavar='FICHIER.pdf',
                        help='Générer un rapport PDF (requiert reportlab)')
@@ -4591,6 +5000,8 @@ Exemples:
     parser.add_argument('--vlan-timeout', type=int, default=65,
                        help='Timeout découverte VLAN (défaut: 65s, couvre au moins 1 cycle CDP de 60s)')
     
+    parser.add_argument('--yes-large-cidr', action='store_true',
+                       help='Accepter automatiquement les cibles CIDR > 256 hÃ´tes')
     args = parser.parse_args()
     
     # Lister les catégories NSE
@@ -4627,6 +5038,17 @@ Exemples:
     
     # Le cache CVE est chargé à l'initialisation de CVEDatabase si le fichier existe
     
+    # Purge optionnelle du cache CVE
+    if args.clear_cve_cache and args.cve_cache:
+        try:
+            if os.path.exists(args.cve_cache):
+                os.remove(args.cve_cache)
+                print(f"[+] Cache CVE supprimÃ©: {os.path.abspath(args.cve_cache)}")
+            else:
+                print(f"[i] Aucun cache CVE Ã  supprimer: {os.path.abspath(args.cve_cache)}")
+        except Exception as e:
+            print(f"[!] Impossible de supprimer le cache CVE: {e}")
+
     # Appliquer le profil
     if args.profile:
         profile = SCAN_PROFILES[args.profile]
@@ -4692,6 +5114,7 @@ Exemples:
         cve_db=cve_db,
         nse_scripts=nse_final if nse_final else None,
         banner_grab=not args.no_banner,
+        yes_large_cidr=args.yes_large_cidr,
     )
     
     auditor.run_audit()
