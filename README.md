@@ -9,7 +9,7 @@
 ![audit-flash](images/audit-flash-v1.0.1.svg)  
 ![Python](images/made-with-python.svg)
 ![Machine](images/works-on-your-machine.svg)
-![TIBEL](images/powered-by-tibel-security.svg)
+
 
 
 📌 This project allows you to perform a quick security audit of your work environment and generate a clear and accurate report of potential vulnerabilities. The goal is to see what data can be collected without an domain account and to highlight potential vulnerabilities.
