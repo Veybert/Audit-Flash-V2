@@ -105,7 +105,7 @@ The Cyberscore (0–100) is computed **exclusively from real CVEs/CVSS scores** 
 
 1. Clone the repository :
 ```
-git clone https://github.com/Greta-Ardeche-Drome/Audit-Flash
+git clone https://github.com/Veybert/Audit-Flash-V2.git
 ```
 2. Requirements installation :
 ```
