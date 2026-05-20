@@ -36,7 +36,7 @@
 2. **Operating System** Windows 10/11 🪟
 3. Download **Python** from the official website [python.org](https://www.python.org/downloads/) and remember to tick the box: ✔️Add to PATH.
 4. Download **Nmap** from [nmap.org](https://nmap.org/download.html)
-5. Download git for Windows or Linux
+5. Download **Git** for Windows or Linux
 
 ## 🧪 What are we testing ?
 
